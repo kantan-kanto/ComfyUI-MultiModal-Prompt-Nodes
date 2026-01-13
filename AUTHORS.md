@@ -20,11 +20,6 @@
   - Text-to-Video and Image-to-Video prompt optimization
   - Wan2.2-specific prompt templates
   - Local Qwen3-VL integration for video tasks
-  
-- General Prompt Rewriter (nodes.py)
-  - Cloud API-based prompt enhancement
-  - Multiple style presets (General, Flux, SDXL, MMAudio)
-  - Aliyun Dashscope API integration
 
 - Project Infrastructure
   - Repository structure and organization
@@ -40,8 +35,8 @@ This project builds upon and derives from the following GPL-3.0 licensed project
 - **Author**: lihaoyun6
 - **Repository**: https://github.com/lihaoyun6/ComfyUI-QwenPromptRewriter
 - **License**: GPL-3.0
-- **Used in**: `nodes.py`, `qwen_nodes.py`, `wan_nodes.py`
-- **Contributions**: Base API integration structure, system prompts, workflow patterns
+- **Used in**: `qwen_nodes.py`, `wan_nodes.py`
+- **Contributions**: API integration patterns, system prompt concepts, workflow design
 
 ### ComfyUI-QwenVL
 - **Author**: 1038lab

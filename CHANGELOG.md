@@ -5,6 +5,16 @@ All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-01-13
+
+### Removed
+- General Prompt Rewriter (nodes.py) - Removed as it was unchanged from original ComfyUI-QwenPromptRewriter
+  - Users should use the original ComfyUI-QwenPromptRewriter for this functionality
+
+### Changed
+- Updated documentation to reflect 3-node architecture
+- Clarified project scope: focus on multimodal (vision + text) capabilities
+
 ## [1.0.4] - 2026-01-12
 
 ### Author
@@ -14,8 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release of ComfyUI-MultiModal-Prompt-Nodes
 - Vision LLM Node: Local GGUF vision language model support
   - Qwen2.5-VL and Qwen3-VL compatibility
-  - Multi-image input (up to 3 images)
-  - Multiple style presets and custom system prompts
+  - Multi-image input (batch support)
+  - Multiple style presets (raw, default, detailed, concise, creative)
 - Qwen Image Edit Prompt Generator: Image editing prompt generation
   - Dynamic model selection (local GGUF + cloud API)
   - Manual mmproj selection for Qwen3-VL
@@ -24,9 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Text-to-Video and Image-to-Video task support
   - Local Qwen3-VL integration
   - Wan2.2-specific prompt templates
-- General Prompt Rewriter: Cloud API-based prompt enhancement
-  - Multiple style presets (General, Flux, SDXL, MMAudio)
-  - Aliyun Dashscope API integration
 
 ### Technical Details
 - GPL-3.0 license (due to llama-cpp-python dependency)

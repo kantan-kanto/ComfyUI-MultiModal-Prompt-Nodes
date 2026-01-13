@@ -1,9 +1,9 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.4  
+**Version:** 1.0.5  
 **License:** GPL-3.0
 
-Advanced multimodal prompt generation nodes for ComfyUI, supporting both cloud API and local GGUF models.
+Advanced multimodal prompt generation nodes for ComfyUI with local GGUF models (Qwen-VL) and cloud API support.
 
 ---
 
@@ -49,11 +49,6 @@ Vision input support varies by model and llama-cpp-python version. See Installat
 - **Extended token limit**: 2048 tokens to support longer Chinese prompts (600+ characters)
 - **Device selection**: CPU/GPU dropdown for local model execution
 - **Optimized for Chinese**: Better performance with Chinese language prompts
-
-### 4. General Prompt Rewriter
-- **Cloud API support**: Multiple Qwen model options for various styles
-- **Style presets**: General, Flux, SDXL, MMAudio optimized prompts
-- **Flexible configuration**: Supports custom system prompts
 
 ---
 
@@ -233,20 +228,6 @@ Add your Alibaba Cloud Dashscope API key to this file.
 5. Ensure model supports vision (qwen-vl-*)
 6. Run to get I2V prompt
 
-### General Prompt Rewriter
-
-**Inputs:**
-- `prompt`: Input prompt to rewrite
-- `prompt_style`: Style preset (General/Flux/SDXL/MMAudio)
-- `llm_model`: Cloud API model selection
-- `max_retries`: API retry attempts
-- `API_KEY`: Inline API key (or use api_key.txt)
-
-**Use cases:**
-- Style-specific prompt optimization
-- NSFW content generation prompts
-- Audio description generation (MMAudio)
-
 ---
 
 ## Model Compatibility
@@ -385,7 +366,7 @@ ComfyUI/custom_nodes/ComfyUI-MultiModal-Prompt-Nodes/api_key.txt
 
 2. Add your Alibaba Cloud Dashscope API key (single line, no quotes)
 
-3. The key will be automatically loaded by Qwen, Wan, and General Prompt Rewriter nodes
+3. The key will be automatically loaded by Qwen and Wan nodes when using cloud API models
 
 ### Security Notes
 - Never commit `api_key.txt` to version control
@@ -465,7 +446,7 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.3
+### Current Version: 1.0.5
 - Device selection: CPU/GPU dropdown
 - Raw style for Vision LLM Node
 - Unified interface across all nodes
