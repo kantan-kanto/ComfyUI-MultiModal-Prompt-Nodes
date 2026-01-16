@@ -1,9 +1,10 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.5  
+**Version:** 1.0.6  
 **License:** GPL-3.0
 
-Advanced multimodal prompt generation nodes for ComfyUI with local GGUF models (Qwen-VL) and cloud API support.
+Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **QwenImageEdit** and **Wan2.2**.  
+Supports **local LLM / local GGUF models** (Qwen3-VL, Qwen-VL) and **Qwen API** for image and video prompt generation and enhancement.
 
 ---
 
@@ -16,6 +17,13 @@ Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **signifi
 
 ### Vision Input Compatibility
 Vision input support varies by model and llama-cpp-python version. See Installation section for detailed compatibility information. Results may vary based on your specific environment.
+
+### Local GGUF Model Stability
+Starting from **v1.0.6**, internal GGUF model handling has been improved to ensure stable behavior
+when switching between different Qwen3-VL models (e.g. 8B ↔ 4B), with mmproj files now being
+properly reloaded as part of the model switching process.
+
+These changes are internal and do **not** affect node interfaces or workflows.
 
 ---
 
@@ -85,10 +93,8 @@ pip install dashscope pillow numpy
 
 ***Note:** Vision input support may vary depending on your environment and configuration. In my setup, I have not been able to get vision input working with Qwen2.5-VL even with the JamePeng fork.
 
-**Recommended Installation (JamePeng fork for Qwen3-VL support):**
-```bash
-pip install llama-cpp-python==0.3.21 --break-system-packages
-```
+**Recommended Installation (JamePeng fork for Qwen3-VL support):**  
+Please follow the build and installation instructions provided in the JamePeng fork repository, as this fork requires a custom build and cannot be reliably installed via a simple `pip install`.
 
 **Source:** https://github.com/JamePeng/llama-cpp-python
 
@@ -97,6 +103,9 @@ pip install llama-cpp-python==0.3.21 --break-system-packages
 - JamePeng fork 0.3.21+: Qwen3-VL works with vision input, Qwen2.5-VL text works but vision input still unavailable
 
 ⚠️ **Disclaimer:** Your results may differ depending on system configuration, GPU drivers, and other factors. If you encounter issues, please verify your environment setup and consider reporting compatibility details.
+
+**Note:** When using Qwen3-VL GGUF models, switching between different model sizes
+(e.g. 8B ↔ 4B) is supported and stable as of v1.0.6.
 
 ### 4. Place Models
 
@@ -406,19 +415,36 @@ For full details, see the [LICENSE](LICENSE) file and [AUTHORS.md](AUTHORS.md).
 
 ---
 
+## Internal Structure Notes (for Advanced Users)
+
+This repository may introduce internal structural changes over time
+(e.g. extracting Local GGUF or Cloud API implementations into separate modules)
+to improve maintainability and stability.
+
+- Node interfaces (INPUT / RETURN types) are intended to remain stable
+- Internal refactors will be documented in the changelog
+- The `backends/` directory added in v1.0.6 is a **non-functional placeholder**
+  for future internal refactoring
+
+No user action is required.
+
+---
+
 ## Credits
 
-### Original Authors
+### Derived From / Inspirations
+This project is a restructured and extended ComfyUI custom node collection, derived from the following GPL-3.0 licensed projects:
+
 - **ComfyUI-QwenPromptRewriter**: [lihaoyun6](https://github.com/lihaoyun6/ComfyUI-QwenPromptRewriter) (GPL-3.0)
 - **ComfyUI-QwenVL**: [1038lab](https://github.com/1038lab/ComfyUI-QwenVL) (GPL-3.0)
 
-### Dependencies
-- **llama-cpp-python**: [Andrei Betlen](https://github.com/abetlen/llama-cpp-python)
-- **Qwen3-VL support**: [JamePeng's fork](https://github.com/JamePeng/llama-cpp-python)
-- **Qwen models**: [Alibaba Cloud Qwen Team](https://github.com/QwenLM/Qwen)
-- **Dashscope API**: Alibaba Cloud
+For detailed attribution, file-level mapping, and contribution notes, see **[AUTHORS.md](AUTHORS.md)**.
 
-For full attribution, see [AUTHORS.md](AUTHORS.md)
+### Key Dependencies / Providers
+- **llama-cpp-python**: Andrei Betlen  
+- **Qwen3-VL support**: JamePeng's llama-cpp-python fork  
+- **Qwen models**: Alibaba Cloud Qwen Team  
+- **Dashscope API**: Alibaba Cloud
 
 ---
 
@@ -446,10 +472,9 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.5
-- Device selection: CPU/GPU dropdown
-- Raw style for Vision LLM Node
-- Unified interface across all nodes
-- Extended token limit for Wan (2048)
-- API key management via api_key.txt only
-- mmproj auto-detect improvements
+### Current Version: 1.0.6
+- Improved stability when switching between Qwen3-VL GGUF models
+- Fixed mmproj reuse issues in local vision models
+- Internal structure preparation for future backend refactoring
+- Documentation updates clarifying project scope, installation notes, and attribution
+- No breaking changes to node interfaces

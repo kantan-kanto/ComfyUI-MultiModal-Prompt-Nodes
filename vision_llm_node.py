@@ -180,140 +180,225 @@ def detect_language(text: str) -> str:
 # ============================================================================
 
 class GGUFModelManager:
-    """GGUF model manager class"""
-    
+    """GGUF model manager class
+
+    Notes on robustness:
+    - Qwen3-VL uses an mmproj (vision projector). In practice, llama-cpp / chat handlers
+      may keep mmproj-related state alive longer than expected. To avoid "stale mmproj"
+      issues when switching models (e.g., 8B -> 4B), we:
+        * treat (model_path, mmproj_path, n_ctx, n_gpu_layers, vision_mode) as a signature
+        * explicitly unload + gc before loading a different signature
+        * make mmproj auto-detection choose the best match for the selected model
+    """
+
     def __init__(self):
-        self.model = None
-        self.current_model_path = None
+        self.model: Optional[Llama] = None
         self.chat_handler = None
-    
-    def load_model(self, model_path: str, mmproj_path: Optional[str] = None,
-                   n_ctx: int = 4096, n_gpu_layers: int = 0, 
-                   verbose: bool = False) -> Llama:
+
+        # Keep a full signature of what's currently loaded
+        self._signature: Optional[tuple] = None
+        self.current_model_path: Optional[str] = None
+        self.current_mmproj_path: Optional[str] = None
+
+    def _normalize_path(self, p: Optional[str]) -> Optional[str]:
+        if p is None:
+            return None
+        return os.path.normpath(p)
+
+    def _infer_is_qwen3(self, model_path: str) -> bool:
+        model_name_lower = os.path.basename(model_path).lower()
+        return "qwen3" in model_name_lower
+
+    def _auto_detect_mmproj(self, model_path: str) -> Optional[str]:
+        """Auto-detect an mmproj file that matches the selected model.
+
+        Prefer mmproj names derived from the model base name; only fall back to other
+        mmproj-*.gguf in the same directory if nothing matches.
         """
-        Load GGUF model
-        
-        Args:
-            model_path: Path to GGUF file
-            mmproj_path: Path to mmproj file (required for Qwen3-VL)
-            n_ctx: Context size
-            n_gpu_layers: Number of layers to offload to GPU (0=CPU only)
-            verbose: Verbose logging
-        
-        Returns:
-            Llama model instance
-        """
+        model_dir = os.path.dirname(model_path)
+        base_name = os.path.basename(model_path)
+
+        # Strip common suffixes
+        if base_name.lower().endswith(".gguf"):
+            base_name = base_name[:-5]
+
+        # Candidates in preferred order (most specific first)
+        preferred = [
+            f"mmproj-{base_name}.gguf",
+            f"mmproj-{base_name}-F16.gguf",
+            f"mmproj-{base_name}-Q8_0.gguf",
+        ]
+
+        for fname in preferred:
+            cand = os.path.join(model_dir, fname)
+            if os.path.exists(cand):
+                print(f"[GGUFModelManager] Auto-detected mmproj (preferred): {fname}")
+                return self._normalize_path(cand)
+
+        # Fallback: try any mmproj-*.gguf in the directory (stable sort for determinism)
+        if os.path.exists(model_dir):
+            mmprojs = sorted(
+                [f for f in os.listdir(model_dir) if f.startswith("mmproj") and f.endswith(".gguf")]
+            )
+            if mmprojs:
+                fname = mmprojs[0]
+                cand = os.path.join(model_dir, fname)
+                print(f"[GGUFModelManager] Auto-detected mmproj (fallback): {fname}")
+                return self._normalize_path(cand)
+
+        return None
+
+    def _make_signature(
+        self,
+        model_path: str,
+        mmproj_path: Optional[str],
+        n_ctx: int,
+        n_gpu_layers: int,
+        use_vision: bool,
+    ) -> tuple:
+        return (
+            self._normalize_path(model_path),
+            self._normalize_path(mmproj_path),
+            int(n_ctx),
+            int(n_gpu_layers),
+            bool(use_vision),
+        )
+
+    def load_model(
+        self,
+        model_path: str,
+        mmproj_path: Optional[str] = None,
+        n_ctx: int = 4096,
+        n_gpu_layers: int = 0,
+        verbose: bool = False,
+    ) -> Llama:
+        """Load GGUF model."""
         if not LLAMA_CPP_AVAILABLE:
             raise RuntimeError("llama-cpp-python is not available")
-        
-        # Return if already loaded
-        if self.model is not None and self.current_model_path == model_path:
-            print(f"[GGUFModelManager] Using cached model: {model_path}")
-            return self.model
-        
-        # Load new model
-        print(f"[GGUFModelManager] Loading model: {model_path}")
-        print(f"[GGUFModelManager] n_ctx={n_ctx}, n_gpu_layers={n_gpu_layers}")
-        
-        # Translated
-        model_path = os.path.normpath(model_path)
-        
+
+        model_path = self._normalize_path(model_path)
+
         # Infer Qwen version from model name
-        model_name_lower = os.path.basename(model_path).lower()
-        
-        # Qwen3-VL requiresmmproj is required
-        if 'qwen3' in model_name_lower:
+        is_qwen3 = self._infer_is_qwen3(model_path)
+
+        # Qwen3-VL requires mmproj
+        if is_qwen3:
             if mmproj_path is None:
-                # mmproj auto-detection attempt
-                model_dir = os.path.dirname(model_path)
-                base_name = os.path.basename(model_path).replace('.gguf', '')
-                
-                # Possiblemmproj
-                possible_mmproj_names = [
-                    f"mmproj-{base_name}.gguf",
-                    f"mmproj-{base_name}-F16.gguf",
-                    f"mmproj-{base_name}-Q8_0.gguf",
-                ]
-                
-                # Search formmproj files in directory
-                if os.path.exists(model_dir):
-                    for file in os.listdir(model_dir):
-                        if file.startswith('mmproj') and file.endswith('.gguf'):
-                            mmproj_path = os.path.normpath(os.path.join(model_dir, file))
-                            print(f"[GGUFModelManager] Auto-detected mmproj: {file}")
-                            break
-                
+                mmproj_path = self._auto_detect_mmproj(model_path)
                 if mmproj_path is None:
+                    model_dir = os.path.dirname(model_path)
                     raise ValueError(
-                        f"Qwen3-VL requires mmproj file!\n"
-                        f"Please download mmproj file from:\n"
-                        f"https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF\n"
-                        f"Expected location: {model_dir}\\mmproj-*.gguf"
+                        "Qwen3-VL requires mmproj file!\n"
+                        "Please download mmproj file from the model's GGUF repo.\n"
+                        f"Expected location: {model_dir}{os.sep}mmproj-*.gguf"
                     )
             else:
-                # Explicitly specifiedmmproj also normalized
-                mmproj_path = os.path.normpath(mmproj_path)
-            
+                mmproj_path = self._normalize_path(mmproj_path)
+
             print(f"[GGUFModelManager] Using mmproj: {mmproj_path}")
-        
-        # Vision-compatible creation
+
+        # Decide vision mode + initialize handler
         use_vision = False
-        
-        # Translated
-        if 'qwen3' in model_name_lower and QWEN3_AVAILABLE:
+        chat_handler = None
+
+        if is_qwen3 and QWEN3_AVAILABLE:
             if mmproj_path is not None and os.path.exists(mmproj_path):
                 try:
                     print(f"[GGUFModelManager] Qwen3-VL with mmproj: {mmproj_path}")
-                    self.chat_handler = Qwen3VLChatHandler(clip_model_path=mmproj_path)
+                    chat_handler = Qwen3VLChatHandler(clip_model_path=mmproj_path)
                     use_vision = True
                 except Exception as e:
-                    print(f"[GGUFModelManager] Warning: Failed to initialize Qwen3-VL: {e}")
-                    self.chat_handler = None
+                    print(f"[GGUFModelManager] Warning: Failed to initialize Qwen3-VL chat handler: {e}")
+                    chat_handler = None
+                    use_vision = False
             else:
-                print(f"[GGUFModelManager] Error: Qwen3-VL requires mmproj file")
-                self.chat_handler = None
-        # Translated
-        elif 'qwen2.5' in model_name_lower or 'qwen2_5' in model_name_lower:
-            print(f"[GGUFModelManager] Qwen2.5-VL: Vision not supported, using text-only mode")
-            self.chat_handler = None
+                print("[GGUFModelManager] Error: Qwen3-VL requires an existing mmproj file")
+                chat_handler = None
+                use_vision = False
+        elif "qwen2.5" in os.path.basename(model_path).lower() or "qwen2_5" in os.path.basename(model_path).lower():
+            # Keep current behavior (text-only) to avoid changing features unexpectedly.
+            print("[GGUFModelManager] Qwen2.5-VL: running in text-only mode (no chat handler)")
+            chat_handler = None
+            use_vision = False
         else:
-            print(f"[GGUFModelManager] Using text-only mode")
-            self.chat_handler = None
-        
+            print("[GGUFModelManager] Using text-only mode")
+            chat_handler = None
+            use_vision = False
+
+        new_sig = self._make_signature(
+            model_path=model_path,
+            mmproj_path=mmproj_path,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            use_vision=use_vision,
+        )
+
+        # If signature matches, reuse
+        if self.model is not None and self._signature == new_sig:
+            print(f"[GGUFModelManager] Using cached model: {model_path}")
+            return self.model
+
+        # Otherwise, explicitly unload to avoid stale mmproj/handler state
+        if self.model is not None:
+            print("[GGUFModelManager] Signature changed -> unloading previous model to avoid stale state")
+            self.unload_model()
+
+        print(f"[GGUFModelManager] Loading model: {model_path}")
+        print(f"[GGUFModelManager] n_ctx={n_ctx}, n_gpu_layers={n_gpu_layers}")
+
+        # Store handler on manager (used later to decide if images are supported)
+        self.chat_handler = chat_handler
+
         # Model loading
         if use_vision and self.chat_handler is not None:
-            print(f"[GGUFModelManager] Loading with vision support")
+            print("[GGUFModelManager] Loading with vision support")
             self.model = Llama(
                 model_path=model_path,
                 chat_handler=self.chat_handler,
                 n_ctx=n_ctx,
                 n_gpu_layers=n_gpu_layers,
                 verbose=verbose,
-                logits_all=True,  # Vision model for
+                logits_all=True,  # required by some vision chat handlers
             )
         else:
-            print(f"[GGUFModelManager] Loading in text-only mode")
+            print("[GGUFModelManager] Loading in text-only mode")
             self.model = Llama(
                 model_path=model_path,
                 n_ctx=n_ctx,
                 n_gpu_layers=n_gpu_layers,
                 verbose=verbose,
             )
-        
+
         self.current_model_path = model_path
-        print(f"[GGUFModelManager] Model loaded successfully")
-        
+        self.current_mmproj_path = self._normalize_path(mmproj_path)
+        self._signature = new_sig
+
+        print("[GGUFModelManager] Model loaded successfully")
         return self.model
-    
+
     def unload_model(self):
-        """Unload model from memory"""
+        """Unload model from memory."""
         if self.model is not None:
             print(f"[GGUFModelManager] Unloading model: {self.current_model_path}")
-            del self.model
-            del self.chat_handler
+        try:
+            if self.model is not None:
+                del self.model
+        finally:
             self.model = None
+
+        try:
+            if self.chat_handler is not None:
+                del self.chat_handler
+        finally:
             self.chat_handler = None
-            self.current_model_path = None
+
+        self.current_model_path = None
+        self.current_mmproj_path = None
+        self._signature = None
+
+        # Encourage timely cleanup (important for llama-cpp backends and mmproj state)
+        import gc as _gc
+        _gc.collect()
 
 # Global model manager
 _model_manager = GGUFModelManager()
@@ -429,8 +514,6 @@ class VisionLLMNode:
     Vision LLM Node - Local GGUF vision language models
     """
     
-    VERSION = "1.0.7"  # Translated
-    
     @classmethod
     def INPUT_TYPES(cls):
 
@@ -509,7 +592,7 @@ class VisionLLMNode:
     RETURN_NAMES = ("STRING",)
     FUNCTION = "rewrite"
     CATEGORY = "multimodal/prompt"
-    DESCRIPTION = "[v1.0.7] Qwen3-VL vision support, manual mmproj selection"
+    DESCRIPTION = "Local GGUF vision-language models (Qwen3-VL, Qwen2.5-VL) for prompt generation"
     
     def rewrite(self, prompt: str, model: str, mmproj: str, style: str, target_language: str,
                 max_tokens: int, temperature: float, device: str, image=None) -> tuple:

@@ -336,7 +336,11 @@ class WanVideoPromptGenerator:
                 # vision_llm_node rewrite_prompt_with_gguf import
                 import sys
                 current_dir = os.path.dirname(os.path.abspath(__file__))
-                sys.path.insert(0, current_dir)
+                if current_dir not in sys.path:
+                    sys.path.insert(0, current_dir)
+                # Centralized import path handling
+                from import_utils import ensure_local_import
+                ensure_local_import(__file__)
                 from vision_llm_node import rewrite_prompt_with_gguf
                 
                 # Model path retrieval

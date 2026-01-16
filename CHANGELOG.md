@@ -5,6 +5,27 @@ All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-01-16
+
+### Fixed
+- Fixed an issue where incorrect **mmproj** could remain loaded when switching between Qwen3-VL GGUF models
+  - Properly unload and reload GGUF models when model or mmproj changes
+  - Prevent stale vision projectors from being reused across different Qwen3-VL models
+- Improved **mmproj auto-detection** logic to avoid accidentally picking mmproj files from other models
+
+### Changed
+- Refined internal GGUF model lifecycle management for better stability when switching models (e.g. 8B ↔ 4B)
+- Minor internal refactors to reduce state leakage in llama-cpp-python based vision models
+- Improved README documentation for clarity and accuracy:
+  - Clarified project scope as a **prompt generator for QwenImageEdit and Wan2.2**
+  - Reorganized Credits and Dependencies to clearly separate derived works and external dependencies
+  - Updated llama-cpp-python installation notes to reference the JamePeng fork documentation directly, avoiding incomplete or misleading installation instructions
+
+### Added
+- Added a `backends/` directory as a **structural placeholder**
+  - This directory does not change behavior in v1.0.6
+  - Reserved for future refactoring of Local GGUF and Cloud API backends without changing node interfaces
+
 ## [1.0.5] - 2026-01-13
 
 ### Removed
