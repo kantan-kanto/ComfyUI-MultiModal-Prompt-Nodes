@@ -1,6 +1,6 @@
 [project]
 name = "multimodal-prompt-nodes"
-description = "Advanced multimodal prompt generation nodes for ComfyUI with local GGUF models (Qwen-VL) and cloud API support for vision-based prompt enhancement."
+description = "Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for QwenImageEdit and Wan2.2. Supports local LLM / local GGUF models (Qwen3-VL, Qwen-VL) and Qwen API for image and video prompt generation and enhancement."
 version = "1.0.6"
 license = {file = "LICENSE"} 
 # classifiers = [
