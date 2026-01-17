@@ -1,7 +1,7 @@
 [project]
 name = "multimodal-prompt-nodes"
 description = "Advanced multimodal prompt generation nodes for ComfyUI with local GGUF models (Qwen-VL) and cloud API support for vision-based prompt enhancement."
-version = "1.0.0"
+version = "1.0.6"
 license = {file = "LICENSE"} 
 # classifiers = [
 #     # For OS-independent nodes (works on all operating systems)
@@ -20,12 +20,17 @@ license = {file = "LICENSE"}
 #     "Environment :: GPU :: Apple Metal",    # Apple Metal support
 # ]
 
-dependencies = ["# ComfyUI-MultiModal-Prompt-Nodes Requirements", "# Core dependencies", "llama-cpp-python>=0.3.16  # 0.3.21+ recommended for Qwen3-VL support", "dashscope>=1.20.0", "pillow>=10.0.0", "numpy>=1.24.0", "# Optional: For better performance", "# llama-cpp-python==0.3.21  # JamePeng fork for Qwen3-VL vision support", "# Note: ComfyUI and its dependencies (torch, etc.) are assumed to be installed"]
+dependencies = [
+  "llama-cpp-python>=0.3.16",
+  "dashscope>=1.20.0",
+  "pillow>=10.0.0",
+  "numpy>=1.24.0",
+]
 
 [project.urls]
 Repository = "https://github.com/kantan-kanto/ComfyUI-MultiModal-Prompt-Nodes"
 #  Used by Comfy Registry https://registry.comfy.org
-Documentation = "https://github.com/kantan-kanto/ComfyUI-MultiModal-Prompt-Nodes/wiki"
+Documentation = "https://github.com/kantan-kanto/ComfyUI-MultiModal-Prompt-Nodes/blob/main/README.md"
 "Bug Tracker" = "https://github.com/kantan-kanto/ComfyUI-MultiModal-Prompt-Nodes/issues"
 
 [tool.comfy]
