@@ -34,7 +34,7 @@ Documentation = "https://github.com/kantan-kanto/ComfyUI-MultiModal-Prompt-Nodes
 "Bug Tracker" = "https://github.com/kantan-kanto/ComfyUI-MultiModal-Prompt-Nodes/issues"
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "kantan-kanto"
 DisplayName = "ComfyUI-MultiModal-Prompt-Nodes"
 Icon = ""
 includes = [] 
