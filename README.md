@@ -472,9 +472,5 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.6
-- Improved stability when switching between Qwen3-VL GGUF models
-- Fixed mmproj reuse issues in local vision models
-- Internal structure preparation for future backend refactoring
-- Documentation updates clarifying project scope, installation notes, and attribution
-- No breaking changes to node interfaces
+### Current Version: 1.0.7
+- Fixed incorrect detection of Qwen3-VL when mmproj is set to (Not required).

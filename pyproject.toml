@@ -1,7 +1,7 @@
 [project]
 name = "multimodal-prompt-nodes"
 description = "Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for QwenImageEdit and Wan2.2. Supports local LLM / local GGUF models (Qwen3-VL, Qwen-VL) and Qwen API for image and video prompt generation and enhancement."
-version = "1.0.6"
+version = "1.0.7"
 license = {file = "LICENSE"} 
 # classifiers = [
 #     # For OS-independent nodes (works on all operating systems)

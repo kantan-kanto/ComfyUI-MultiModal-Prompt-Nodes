@@ -5,6 +5,13 @@ All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-01-26
+
+### Fixed
+- Fixed incorrect detection of Qwen3-VL when mmproj is set to (Not required).
+  - Disabled automatic mmproj detection and prevented use of the VL handler in this case.
+  - Updated GGUFModelManager.load_model and node-side mmproj interpretation to correctly respect (Not required).
+
 ## [1.0.6] - 2026-01-16
 
 ### Fixed

@@ -281,8 +281,13 @@ class GGUFModelManager:
         # Infer Qwen version from model name
         is_qwen3 = self._infer_is_qwen3(model_path)
 
-        # Qwen3-VL requires mmproj
-        if is_qwen3:
+        # If user explicitly selected "(Not required)", force text-only even if the filename contains "qwen3".
+        # This prevents accidental Qwen3-VL handler selection and mmproj auto-detection for text-only Qwen3 models.
+        force_no_mmproj = (mmproj_path == "(Not required)")
+        if force_no_mmproj:
+            mmproj_path = None
+        # Qwen3-VL requires mmproj (unless explicitly disabled)
+        if is_qwen3 and not force_no_mmproj:
             if mmproj_path is None:
                 mmproj_path = self._auto_detect_mmproj(model_path)
                 if mmproj_path is None:
@@ -625,7 +630,10 @@ class VisionLLMNode:
             
             # mmproj processing
             mmproj_path = None
-            if mmproj not in ["(Auto-detect)", "(Not required)"]:
+            if mmproj == "(Not required)":
+                # Sentinel to force text-only (prevents mmproj auto-detect / VL handler)
+                mmproj_path = "(Not required)"
+            elif mmproj != "(Auto-detect)":
                 mmproj_path = os.path.normpath(os.path.join(models_dir, mmproj))
                 if not os.path.exists(mmproj_path):
                     print(f"[Vision LLM Node] Warning: mmproj not found: {mmproj_path}")
