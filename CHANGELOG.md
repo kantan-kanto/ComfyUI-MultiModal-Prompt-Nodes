@@ -5,6 +5,18 @@ All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-02-09
+
+- Fixed issue where `Qwen2.5-VL` were always loaded in text-only mode even when a valid mmproj file was specified.
+
+  - Added vision chat handler support for `Qwen2.5-VL`
+  - Enable vision mode automatically when supported model + mmproj are present
+
+- Improved mmproj auto-detection logic
+
+  - Auto-detect now selects mmproj files based on model family prefix (qwen2, qwen3) instead of arbitrary alphabetical fallback
+  - Prevents incorrect mmproj selection when multiple mmproj files exist in the same directory
+
 ## [1.0.7] - 2026-01-26
 
 ### Fixed
@@ -72,7 +84,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Additional model support (Llama, Gemini, etc.)
 - Workflow templates
-- Performance optimization
 - Extended documentation

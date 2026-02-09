@@ -386,7 +386,7 @@ class QwenImageEditPromptGenerator:
             models_dir = os.path.join(folder_paths.models_dir, "LLM")
             if os.path.exists(models_dir):
                 gguf_files = [f for f in os.listdir(models_dir) 
-                             if f.endswith('.gguf') and 'qwen3' in f.lower() and not f.startswith('mmproj')]
+                             if f.endswith('.gguf') and 'qwen' in f.lower() and not f.startswith('mmproj')]
                 local_models = [f"Local: {f}" for f in sorted(gguf_files)]
                 
                 # mmproj
@@ -428,7 +428,7 @@ class QwenImageEditPromptGenerator:
                 }),
                 "mmproj": (mmproj_options, {
                     "default": mmproj_options[0],
-                    "tooltip": "mmproj file (required for Local Qwen3-VL only, select manually or use auto-detect)"
+                    "tooltip": "mmproj file (required for Local model only, select manually or use auto-detect)"
                 }),
                 "max_retries": ("INT",{
                     "default": 3, "min": 1, "max": 10000, "step": 1,
@@ -464,7 +464,7 @@ class QwenImageEditPromptGenerator:
         if image3 is not None:
             all_images.extend(tensor2pil(image3))
         
-        # Local Qwen3-VL processing
+        # Local model processing
         if llm_model.startswith("Local: "):
             try:
 
@@ -488,7 +488,7 @@ class QwenImageEditPromptGenerator:
                 # mmproj processing (same logic as Vision LLM Node)
                 mmproj_path = None
                 if mmproj is None:
-                    raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local Qwen3-VL models.")
+                    raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
                 
                 if mmproj not in ["(Auto-detect)", "(Not required)"]:
                     # User specified a specific mmproj file
@@ -498,7 +498,7 @@ class QwenImageEditPromptGenerator:
                         mmproj_path = None  # Fall back to auto-detect
                 # else: mmproj_path remains None (auto-detect or not required)
                 
-                print(f'[Qwen Prompt Rewriter] Using Local Qwen3-VL')
+                print(f'[Qwen Prompt Rewriter] Using Local model')
                 print(f'[Qwen Prompt Rewriter] Model: {model_filename}')
                 print(f'[Qwen Prompt Rewriter] mmproj: {mmproj}')
                 print(f'[Qwen Prompt Rewriter] Using {len(all_images)} image(s)')
@@ -519,7 +519,7 @@ class QwenImageEditPromptGenerator:
                 )
                 
             except Exception as e:
-                raise RuntimeError(f"Local Qwen3-VL error: {str(e)}")
+                raise RuntimeError(f"Local model error: {str(e)}")
         
         # API processing (cloud models)
         else:

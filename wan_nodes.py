@@ -240,14 +240,14 @@ def polish_prompt_wan(api_key, prompt, task_type="t2v", model="qwen-plus", max_r
 class WanVideoPromptGenerator:
     @classmethod
     def INPUT_TYPES(s):
-        # Local Qwen3-VL
+        # Local models
         local_models = []
         mmproj_files = []
         try:
             models_dir = os.path.join(folder_paths.models_dir, "LLM")
             if os.path.exists(models_dir):
                 gguf_files = [f for f in os.listdir(models_dir) 
-                             if f.endswith('.gguf') and 'qwen3' in f.lower() and not f.startswith('mmproj')]
+                             if f.endswith('.gguf') and 'qwen' in f.lower() and not f.startswith('mmproj')]
                 local_models = [f"Local: {f}" for f in sorted(gguf_files)]
                 
                 # mmproj
@@ -295,7 +295,7 @@ class WanVideoPromptGenerator:
                 }),
                 "mmproj": (mmproj_options, {
                     "default": mmproj_options[0],
-                    "tooltip": "mmproj file (required for Local Qwen3-VL only, select manually or use auto-detect)"
+                    "tooltip": "mmproj file (required for Local model, select manually or use auto-detect)"
                 }),
                 "max_retries": ("INT", {
                     "default": 3, "min": 1, "max": 10000, "step": 1,
@@ -329,7 +329,7 @@ class WanVideoPromptGenerator:
         
         # Local or API model determination
         if llm_model.startswith("Local: "):
-            # Local Qwen3-VL processing (no API key needed)
+            # Local model processing (no API key needed)
             try:
                 model_filename = llm_model.replace("Local: ", "")
                 
@@ -350,7 +350,7 @@ class WanVideoPromptGenerator:
                 # mmproj processing (same logic as Vision LLM Node)
                 mmproj_path = None
                 if mmproj is None:
-                    raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local Qwen3-VL models.")
+                    raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
                 
                 if mmproj not in ["(Auto-detect)", "(Not required)"]:
                     # User specified a specific mmproj file
@@ -386,7 +386,7 @@ class WanVideoPromptGenerator:
                 else:
                     system_prompt = WAN_T2V_SYSTEM_PROMPT_ZH if lang == 'zh' else WAN_T2V_SYSTEM_PROMPT_EN
                 
-                print(f'[Wan2.2 Prompt Rewriter] Using Local Qwen3-VL')
+                print(f'[Wan2.2 Prompt Rewriter] Using Local model')
                 print(f'[Wan2.2 Prompt Rewriter] Model: {model_filename}')
                 print(f'[Wan2.2 Prompt Rewriter] mmproj: {mmproj}')
                 print(f'[Wan2.2 Prompt Rewriter] Task: {task_type}')
@@ -416,7 +416,7 @@ class WanVideoPromptGenerator:
                 return (output_prompt,)
                 
             except Exception as e:
-                raise RuntimeError(f"Local Qwen3-VL processing failed: {str(e)}")
+                raise RuntimeError(f"Local model processing failed: {str(e)}")
         
         # API processing (cloud models) - load API key from api_key.txt
         if not os.path.exists(key_path):

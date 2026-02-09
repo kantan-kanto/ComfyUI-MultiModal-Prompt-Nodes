@@ -34,10 +34,15 @@ import folder_paths
 
 # llama-cpp-python imports
 try:
+    # Qwen2.5-VL and Qwen3-VL vision support via Qwen2VLChatHandler / Qwen3VLChatHandler
     from llama_cpp import Llama
-    from llama_cpp.llama_chat_format import Qwen25VLChatHandler
-    
-    # Qwen2.5-VL and Qwen3-VL vision support via Qwen2VLChatHandler / Qwen25VLChatHandler
+
+    try:
+        from llama_cpp.llama_chat_format import Qwen25VLChatHandler
+        QWEN2_AVAILABLE = True
+    except ImportError:
+        QWEN2_AVAILABLE = False   
+
     try:
         from llama_cpp.llama_chat_format import Qwen3VLChatHandler
         QWEN3_AVAILABLE = True
@@ -47,6 +52,7 @@ try:
     LLAMA_CPP_AVAILABLE = True
 except ImportError:
     LLAMA_CPP_AVAILABLE = False
+    QWEN2_AVAILABLE = False
     QWEN3_AVAILABLE = False
     print("[Vision LLM Node] Warning: llama-cpp-python not available")
 
@@ -205,48 +211,88 @@ class GGUFModelManager:
             return None
         return os.path.normpath(p)
 
+    def _infer_is_qwen2(self, model_path: str) -> bool:
+        model_name_lower = os.path.basename(model_path).lower()
+        return "qwen2" in model_name_lower
+
     def _infer_is_qwen3(self, model_path: str) -> bool:
         model_name_lower = os.path.basename(model_path).lower()
         return "qwen3" in model_name_lower
 
-    def _auto_detect_mmproj(self, model_path: str) -> Optional[str]:
-        """Auto-detect an mmproj file that matches the selected model.
 
-        Prefer mmproj names derived from the model base name; only fall back to other
-        mmproj-*.gguf in the same directory if nothing matches.
+    def _auto_detect_mmproj(self, model_path: str) -> Optional[str]:
+        """
+        Auto-detect mmproj by "family prefix" match.
+
+        Rule:
+        - Determine model family by basename(model).startswith one of:
+            qwen2, qwen3, llava, llama, gemma-3, glm-4
+        - In the same directory, scan mmproj-*.gguf
+        - Keep only those whose mmproj_name (after 'mmproj-') startswith the same family keyword
+        - If exactly one match -> return it
+        - Else (0 or >1) -> raise ValueError
         """
         model_dir = os.path.dirname(model_path)
-        base_name = os.path.basename(model_path)
+        base = os.path.basename(model_path)
+        name = base[:-5] if base.lower().endswith(".gguf") else base
+        name_l = name.lower()
 
-        # Strip common suffixes
-        if base_name.lower().endswith(".gguf"):
-            base_name = base_name[:-5]
+        # Model family keywords (startswith)
+        families = ["qwen2", "qwen3"]
+        family = next((k for k in families if name_l.startswith(k)), None)
 
-        # Candidates in preferred order (most specific first)
-        preferred = [
-            f"mmproj-{base_name}.gguf",
-            f"mmproj-{base_name}-F16.gguf",
-            f"mmproj-{base_name}-Q8_0.gguf",
+        if family is None:
+            raise ValueError(
+                "mmproj auto-detect failed: model name does not start with any supported family prefix.\n"
+                f"model: {base}\n"
+                f"supported prefixes: {', '.join(families)}"
+            )
+
+        if not os.path.exists(model_dir):
+            raise ValueError(
+                "mmproj auto-detect failed: model directory does not exist.\n"
+                f"dir: {model_dir}"
+            )
+
+        # Collect mmproj-*.gguf in the same dir
+        mmproj_files = [
+            f for f in os.listdir(model_dir)
+            if f.startswith("mmproj-") and f.endswith(".gguf")
         ]
 
-        for fname in preferred:
+        # Filter by family prefix on mmproj_name
+        matches = []
+        for f in mmproj_files:
+            mmname = f[len("mmproj-"):-len(".gguf")]
+            if mmname.lower().startswith(family):
+                matches.append(f)
+
+        matches.sort(key=str.lower)
+
+        if len(matches) == 1:
+            fname = matches[0]
             cand = os.path.join(model_dir, fname)
-            if os.path.exists(cand):
-                print(f"[GGUFModelManager] Auto-detected mmproj (preferred): {fname}")
-                return self._normalize_path(cand)
+            print(f"[GGUFModelManager] Auto-detected mmproj (family={family}): {fname}")
+            return self._normalize_path(cand)
 
-        # Fallback: try any mmproj-*.gguf in the directory (stable sort for determinism)
-        if os.path.exists(model_dir):
-            mmprojs = sorted(
-                [f for f in os.listdir(model_dir) if f.startswith("mmproj") and f.endswith(".gguf")]
+        if len(matches) == 0:
+            raise ValueError(
+                "mmproj auto-detect failed: no mmproj matched the model family prefix.\n"
+                f"model: {base}\n"
+                f"family: {family}\n"
+                f"dir: {model_dir}\n"
+                f"mmproj candidates: {', '.join(sorted(mmproj_files, key=str.lower)) or '(none)'}"
             )
-            if mmprojs:
-                fname = mmprojs[0]
-                cand = os.path.join(model_dir, fname)
-                print(f"[GGUFModelManager] Auto-detected mmproj (fallback): {fname}")
-                return self._normalize_path(cand)
 
-        return None
+        # len(matches) > 1
+        raise ValueError(
+            "mmproj auto-detect failed: multiple mmproj files matched the model family prefix.\n"
+            f"model: {base}\n"
+            f"family: {family}\n"
+            f"dir: {model_dir}\n"
+            f"matched: {', '.join(matches)}\n"
+            "Please select mmproj manually."
+        )
 
     def _make_signature(
         self,
@@ -279,6 +325,7 @@ class GGUFModelManager:
         model_path = self._normalize_path(model_path)
 
         # Infer Qwen version from model name
+        is_qwen2 = self._infer_is_qwen2(model_path)
         is_qwen3 = self._infer_is_qwen3(model_path)
 
         # If user explicitly selected "(Not required)", force text-only even if the filename contains "qwen3".
@@ -286,8 +333,19 @@ class GGUFModelManager:
         force_no_mmproj = (mmproj_path == "(Not required)")
         if force_no_mmproj:
             mmproj_path = None
+        # Qwen2.5-VL requires mmproj (unless explicitly disabled)
+        elif is_qwen2 and not force_no_mmproj:
+            if mmproj_path is None:
+                mmproj_path = self._auto_detect_mmproj(model_path)
+                if mmproj_path is None:
+                    model_dir = os.path.dirname(model_path)
+                    raise ValueError(
+                        "Qwen2.5-VL requires mmproj file!\n"
+                        "Please download mmproj file from the model's GGUF repo.\n"
+                        f"Expected location: {model_dir}{os.sep}mmproj-*.gguf"
+                    )
         # Qwen3-VL requires mmproj (unless explicitly disabled)
-        if is_qwen3 and not force_no_mmproj:
+        elif is_qwen3 and not force_no_mmproj:
             if mmproj_path is None:
                 mmproj_path = self._auto_detect_mmproj(model_path)
                 if mmproj_path is None:
@@ -306,7 +364,21 @@ class GGUFModelManager:
         use_vision = False
         chat_handler = None
 
-        if is_qwen3 and QWEN3_AVAILABLE:
+        if is_qwen2 and QWEN2_AVAILABLE:
+            if mmproj_path is not None and os.path.exists(mmproj_path):
+                try:
+                    print(f"[GGUFModelManager] Qwen2.5-VL with mmproj: {mmproj_path}")
+                    chat_handler = Qwen25VLChatHandler(clip_model_path=mmproj_path)
+                    use_vision = True
+                except Exception as e:
+                    print(f"[GGUFModelManager] Warning: Failed to initialize Qwen2.5-VL chat handler: {e}")
+                    chat_handler = None
+                    use_vision = False
+            else:
+                print("[GGUFModelManager] Error: Qwen2.5-VL requires an existing mmproj file")
+                chat_handler = None
+                use_vision = False
+        elif is_qwen3 and QWEN3_AVAILABLE:
             if mmproj_path is not None and os.path.exists(mmproj_path):
                 try:
                     print(f"[GGUFModelManager] Qwen3-VL with mmproj: {mmproj_path}")
@@ -320,11 +392,6 @@ class GGUFModelManager:
                 print("[GGUFModelManager] Error: Qwen3-VL requires an existing mmproj file")
                 chat_handler = None
                 use_vision = False
-        elif "qwen2.5" in os.path.basename(model_path).lower() or "qwen2_5" in os.path.basename(model_path).lower():
-            # Keep current behavior (text-only) to avoid changing features unexpectedly.
-            print("[GGUFModelManager] Qwen2.5-VL: running in text-only mode (no chat handler)")
-            chat_handler = None
-            use_vision = False
         else:
             print("[GGUFModelManager] Using text-only mode")
             chat_handler = None
@@ -430,7 +497,7 @@ def rewrite_prompt_with_gguf(
     Args:
         prompt: Original prompt
         model_path: Path to GGUF model
-        mmproj_path: Path to mmproj file (required for Qwen3-VL)
+        mmproj_path: Path to mmproj file
         style: Prompt style
         target_language: Target language
         images: Input image list (optional)
@@ -565,7 +632,7 @@ class VisionLLMNode:
                 }),
                 "mmproj": (mmproj_options, {
                     "default": mmproj_options[0],
-                    "tooltip": "mmproj file (required for Qwen3-VL, select manually or use auto-detect)"
+                    "tooltip": "mmproj file (select manually or use auto-detect)"
                 }),
                 "max_tokens": ("INT", {
                     "default": 512,
@@ -669,12 +736,7 @@ class VisionLLMNode:
                 error_str = str(e)
                 if "Failed to load model" in error_str:
                     error_msg = (
-                        f"ERROR: Failed to load model '{model}'\n"
-                        "This is likely Qwen3-VL which requires llama-cpp-python >= 0.4.0\n"
-                        "Current version: 0.3.16\n\n"
-                        "Solutions:\n"
-                        "1. Use Qwen2.5-VL instead (recommended)\n"
-                        "2. Upgrade: pip install llama-cpp-python --upgrade"
+                        f"ERROR: Failed to load model '{model}'"
                     )
                     print(f"[Vision LLM Node] {error_msg}")
                     raise RuntimeError(error_msg)

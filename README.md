@@ -1,10 +1,10 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.6  
+**Version:** 1.0.8
 **License:** GPL-3.0
 
 Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **QwenImageEdit** and **Wan2.2**.  
-Supports **local LLM / local GGUF models** (Qwen3-VL, Qwen-VL) and **Qwen API** for image and video prompt generation and enhancement.
+Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL) and **Qwen API** for image and video prompt generation and enhancement.
 
 ---
 
@@ -16,6 +16,7 @@ Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **signifi
 **Recommendation:** Set `target_language` to **"zh"** (Chinese) for best results with these models, even if your input is in English. The models will generate more coherent and instruction-following outputs.
 
 ### Vision Input Compatibility
+Starting from **version 1.0.8**, image input for **Qwen2.5-VL** is now available in **version 0.3.16 of llama-cpp-python(official)**.
 Vision input support varies by model and llama-cpp-python version. See Installation section for detailed compatibility information. Results may vary based on your specific environment.
 
 ### Local GGUF Model Stability
@@ -86,36 +87,29 @@ pip install dashscope pillow numpy
 
 **Important:** Model compatibility varies by llama-cpp-python version. Based on my testing environment:
 
-| Version | Qwen2.5-VL (Text) | Qwen2.5-VL (Vision) | Qwen3-VL | 
-|---------|-------------------|---------------------|----------|
-| 0.3.16 (official) | ✅ | ❌ | ❌ |
-| 0.3.21+ (JamePeng fork) | ✅ | ❌* | ✅ |
+| Version | Qwen2.5-VL | Qwen3-VL | 
+|---------|------------|----------|
+| 0.3.16 (official) | ✅ | ❌ |
+| 0.3.21+ (JamePeng fork) | ✅ | ✅ |
 
-***Note:** Vision input support may vary depending on your environment and configuration. In my setup, I have not been able to get vision input working with Qwen2.5-VL even with the JamePeng fork.
+***Note:** Vision input support may vary depending on your environment and configuration.
 
 **Recommended Installation (JamePeng fork for Qwen3-VL support):**  
 Please follow the build and installation instructions provided in the JamePeng fork repository, as this fork requires a custom build and cannot be reliably installed via a simple `pip install`.
 
 **Source:** https://github.com/JamePeng/llama-cpp-python
 
-**My Environment Results:**
-- Official llama-cpp-python 0.3.16: Qwen2.5-VL text-only, no vision input, Qwen3-VL fails to load
-- JamePeng fork 0.3.21+: Qwen3-VL works with vision input, Qwen2.5-VL text works but vision input still unavailable
-
 ⚠️ **Disclaimer:** Your results may differ depending on system configuration, GPU drivers, and other factors. If you encounter issues, please verify your environment setup and consider reporting compatibility details.
-
-**Note:** When using Qwen3-VL GGUF models, switching between different model sizes
-(e.g. 8B ↔ 4B) is supported and stable as of v1.0.6.
 
 ### 4. Place Models
 
 Place your GGUF models in `ComfyUI/models/LLM/`:
 ```
 ComfyUI/models/LLM/
-├── Qwen3VL-4B-Q4_K_M.gguf
-├── Qwen3VL-4B-Q8_0.gguf
-├── mmproj-qwen3vl-4b-f16.gguf
-└── ...
+├── Qwen2.5VL-7B-F16_0.gguf
+├── Qwen3VL-8B-Instruct-Q8_0.gguf
+├── mmproj-Qwen2.5-VL-7B-Instruct-F16.gguf
+└── mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf
 ```
 
 ### 5. Configure API Key (Optional, for cloud models)
@@ -241,10 +235,9 @@ Add your Alibaba Cloud Dashscope API key to this file.
 
 ## Model Compatibility
 
-### Qwen2.5-VL (Integrated mmproj)
-- ✅ Qwen2.5-VL-2B: Text-only in my environment
-- ✅ Qwen2.5-VL-7B: Text-only in my environment
-- ⚠️ mmproj integrated but vision input unavailable in my setup
+### Qwen2.5-VL (Separate mmproj)
+- ✅ Qwen2.5-VL-7B: Full vision support
+- ✅ Requires matching mmproj file
 
 ### Qwen3-VL (Separate mmproj)
 - ✅ Qwen3-VL-4B: Full vision support with JamePeng fork
@@ -316,7 +309,7 @@ A:
 3. Verify file extensions are `.gguf`
 
 **Q: Vision input not working with Qwen2.5-VL**  
-A: This is a known issue in my environment. Qwen2.5-VL currently only supports text input. Use Qwen3-VL for vision capabilities.
+A: Use version 1.0.8 or later. Fixed bug.
 
 **Q: Out of memory errors**  
 A: 
@@ -472,5 +465,6 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.7
-- Fixed incorrect detection of Qwen3-VL when mmproj is set to (Not required).
+### Current Version: 1.0.8
+- Fixed issue where `Qwen2.5-VL` were always loaded in text-only mode even when a valid mmproj file was specified.
+- Improved mmproj auto-detection logic.
