@@ -3,7 +3,7 @@
 **Version:** 1.0.8
 **License:** GPL-3.0
 
-Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **QwenImageEdit** and **Wan2.2**.  
+Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **Qwen-Image-Edit** and **Wan2.2**.  
 Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL) and **Qwen API** for image and video prompt generation and enhancement.
 
 ---
@@ -16,8 +16,10 @@ Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **signifi
 **Recommendation:** Set `target_language` to **"zh"** (Chinese) for best results with these models, even if your input is in English. The models will generate more coherent and instruction-following outputs.
 
 ### Vision Input Compatibility
-Starting from **version 1.0.8**, image input for **Qwen2.5-VL** is now available in **version 0.3.16 of llama-cpp-python(official)**.
+Starting from **v1.0.8**, image input for **Qwen2.5-VL** is now available in **version 0.3.16 of llama-cpp-python(official)**.
 Vision input support varies by model and llama-cpp-python version. See Installation section for detailed compatibility information. Results may vary based on your specific environment.
+
+**Recommendation:** Use **Qwen3-VL** with Qwen-Image-Edit. **Qwen2.5-VL** currently shows insufficient adherence to user prompts under the existing system prompt configuration.
 
 ### Local GGUF Model Stability
 Starting from **v1.0.6**, internal GGUF model handling has been improved to ensure stable behavior
@@ -31,33 +33,32 @@ These changes are internal and do **not** affect node interfaces or workflows.
 ## Features
 
 ### 1. Vision LLM Node
-- **Local GGUF support**: Run Qwen2.5-VL and Qwen3-VL models locally
-- **Multi-image input**: Support batch image input via ComfyUI's batch nodes (e.g., Images Batch Multiple)
 - **Flexible prompting styles**: 
   - `raw`: Direct LLM response without system prompt
   - `default`: Balanced prompt enhancement
   - `detailed`: Rich visual details (colors, textures, lighting, atmosphere)
   - `concise`: Minimal keywords, focused on core elements
   - `creative`: Artistic interpretation with unique perspectives
-- **Device selection**: Simple CPU/GPU dropdown for hardware control
-- **Auto-detect mmproj**: Automatic detection or manual selection for Qwen3-VL
+- **Multi-image input**: Support batch image input via ComfyUI's batch nodes (e.g., Images Batch Multiple)
+- **Local GGUF support**: Run Qwen2.5-VL and Qwen3-VL models locally
+- **Auto-detect mmproj**: Automatic detection or manual selection
 
 ### 2. Qwen Image Edit Prompt Generator
-- **Dynamic model selection**: Auto-detect local GGUF models and cloud API models
 - **Image editing prompts**: Specialized for Qwen-Image-Edit tasks
-- **Manual mmproj selection**: Choose specific mmproj files or use auto-detect
+- **Optimized for Chinese**: Better performance with Chinese language prompts
 - **Multi-image support**: Up to 3 images via optional inputs (image2/image3)
-- **Unified interface**: Consistent parameter ordering and naming
+- **Dynamic model selection**: Auto-detect local GGUF models and cloud API models
+- **Auto-detect mmproj**: Automatic detection or manual selection
 - **API key management**: Centralized configuration via `api_key.txt`
-- **Device control**: CPU/GPU selection for local models
 
 ### 3. Wan Video Prompt Generator
 - **Video generation prompts**: Optimized for Wan2.2 text-to-video and image-to-video
-- **Local Qwen3-VL integration**: Use local models for prompt enhancement
 - **Task-specific optimization**: Separate prompts for T2V and I2V workflows
-- **Extended token limit**: 2048 tokens to support longer Chinese prompts (600+ characters)
-- **Device selection**: CPU/GPU dropdown for local model execution
 - **Optimized for Chinese**: Better performance with Chinese language prompts
+- **Extended token limit**: 2048 tokens to support longer Chinese prompts (600+ characters)
+- **Dynamic model selection**: Auto-detect local GGUF models and cloud API models
+- **Auto-detect mmproj**: Automatic detection or manual selection
+- **API key management**: Centralized configuration via `api_key.txt`
 
 ---
 
@@ -139,7 +140,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 - `model`: Select from auto-detected local GGUF models
 - `mmproj`: mmproj file selection
   - `(Auto-detect)`: Automatically search for matching mmproj
-  - `(Not required)`: For Qwen2.5-VL or text-only mode
+  - `(Not required)`: For text-only mode
   - Specific file: Manually select mmproj file
 - `max_tokens`: Maximum tokens to generate (default: 512)
 - `temperature`: Sampling temperature (0.0-2.0, default: 0.7)
@@ -150,7 +151,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 1. Load Vision LLM Node
 2. Enter basic prompt: "a cat sitting on a windowsill"
 3. Attach image via batch node (optional)
-4. Select Qwen3-VL model
+4. Select model
 5. Choose `(Auto-detect)` for mmproj or select specific file
 6. Select style: `default`
 7. Set device: `CPU` or `GPU`
@@ -168,9 +169,9 @@ Add your Alibaba Cloud Dashscope API key to this file.
 - `llm_model`: Model selection
   - `Local: xxx`: Local GGUF models (auto-detected)
   - API models: qwen-vl-max, qwen-plus, etc.
-- `mmproj`: mmproj file (required for local Qwen3-VL)
+- `mmproj`: mmproj file (required for local models)
   - `(Auto-detect)`: Automatic detection
-  - `(Not required)`: For API models or Qwen2.5-VL
+  - `(Not required)`: For API models or text-only mode 
   - Specific file: Manual selection
 - `max_retries`: Retry attempts for API calls (default: 3)
 - `device`: CPU/GPU selection for local models
@@ -236,12 +237,12 @@ Add your Alibaba Cloud Dashscope API key to this file.
 ## Model Compatibility
 
 ### Qwen2.5-VL (Separate mmproj)
-- ✅ Qwen2.5-VL-7B: Full vision support
+- ✅ Qwen2.5-VL(3B/7B): Full vision support
 - ✅ Requires matching mmproj file
+- ❌ Insufficient adherence to user prompts under the existing system prompt configuration with **Qwen-Image-Edit**
 
 ### Qwen3-VL (Separate mmproj)
-- ✅ Qwen3-VL-4B: Full vision support with JamePeng fork
-- ✅ Qwen3-VL-7B: Full vision support with JamePeng fork
+- ✅ Qwen3-VL(4B/7B): Full vision support with JamePeng fork
 - ✅ Requires matching mmproj file
 
 ### Recommended Quantization
@@ -300,7 +301,7 @@ A: Ensure you're using llama-cpp-python 0.3.21+ (JamePeng fork). Version 0.3.16 
 ### Runtime Issues
 
 **Q: "mmproj not specified" error**  
-A: Select an mmproj file (or choose `(Auto-detect)`) in the mmproj dropdown for Qwen3-VL models
+A: Select an mmproj file (or choose `(Auto-detect)`) in the mmproj dropdown for local models
 
 **Q: "No models found" in model dropdown**  
 A: 
@@ -309,7 +310,7 @@ A:
 3. Verify file extensions are `.gguf`
 
 **Q: Vision input not working with Qwen2.5-VL**  
-A: Use version 1.0.8 or later. Fixed bug.
+A: Use v1.0.8 or later. Fixed bug.
 
 **Q: Out of memory errors**  
 A: 
