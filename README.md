@@ -19,7 +19,7 @@ Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **signifi
 Starting from **v1.0.8**, image input for **Qwen2.5-VL** is now available in **version 0.3.16 of llama-cpp-python(official)**.
 Vision input support varies by model and llama-cpp-python version. See Installation section for detailed compatibility information. Results may vary based on your specific environment.
 
-**Recommendation:** Use **Qwen3-VL** with Qwen-Image-Edit. **Qwen2.5-VL** currently shows insufficient adherence to user prompts under the existing system prompt configuration.
+**Recommendation:** Use **Qwen API** or **Qwen3-VL** with Qwen-Image-Edit. **Qwen2.5-VL** currently shows insufficient adherence to user prompts under the existing system prompt configuration.
 
 ### Local GGUF Model Stability
 Starting from **v1.0.6**, internal GGUF model handling has been improved to ensure stable behavior
@@ -242,13 +242,8 @@ Add your Alibaba Cloud Dashscope API key to this file.
 - ❌ Insufficient adherence to user prompts under the existing system prompt configuration with **Qwen-Image-Edit**
 
 ### Qwen3-VL (Separate mmproj)
-- ✅ Qwen3-VL(4B/7B): Full vision support with JamePeng fork
+- ✅ Qwen3-VL(4B/8B): Full vision support with JamePeng fork
 - ✅ Requires matching mmproj file
-
-### Recommended Quantization
-- **Q4_K_M**: Balanced quality/size (recommended for most users)
-- **Q5_K_M**: Higher quality, larger size
-- **Q8_0**: Maximum quality, largest size
 
 ### Model Sources
 - Qwen models: https://huggingface.co/Qwen
@@ -257,40 +252,12 @@ Add your Alibaba Cloud Dashscope API key to this file.
 
 ---
 
-## Configuration
-
-### System Requirements
-- **RAM**: 8GB+ (16GB recommended for 7B models)
-- **Storage**: 3-8GB per model (depending on quantization)
-- **GPU**: Optional (CPU execution supported)
-  - NVIDIA GPU: CUDA support via llama-cpp-python
-  - AMD GPU: ROCm support (requires specific build)
-  - Intel Arc: Limited support, CPU recommended
-
-### Performance Tips
-1. **Use Q4_K_M quantization** for faster inference and lower memory usage
-2. **Reduce max_tokens** if hitting memory limits
-3. **Enable GPU** if you have compatible hardware (select `GPU` in device dropdown)
-4. **Use CPU for stability** if encountering GPU issues
-5. **Batch multiple requests** when possible for efficiency
-6. **Close other applications** to free up RAM during inference
-
-### Memory Usage Guide
-| Model | Quantization | RAM Usage |
-|-------|--------------|-----------|
-| Qwen3-VL-4B | Q4_K_M | ~4-5GB |
-| Qwen3-VL-4B | Q8_0 | ~7-8GB |
-| Qwen3-VL-7B | Q4_K_M | ~6-7GB |
-| Qwen3-VL-7B | Q8_0 | ~12-14GB |
-
----
-
 ## Troubleshooting
 
 ### Installation Issues
 
 **Q: "No module named 'llama_cpp'" error**  
-A: Install llama-cpp-python: `pip install llama-cpp-python==0.3.21 --break-system-packages`
+A: Install llama-cpp-python: `pip install llama-cpp-python`
 
 **Q: pip install fails with "externally-managed-environment"**  
 A: Use `--break-system-packages` flag or create a virtual environment
