@@ -24,6 +24,21 @@ import folder_paths
 import numpy as np
 from PIL import Image
 
+try:
+    from .local_gguf_utils import (
+        discover_local_gguf_models,
+        discover_local_mmproj_files,
+        resolve_local_gguf_path,
+        resolve_mmproj_path_for_model,
+    )
+except ImportError:
+    from local_gguf_utils import (
+        discover_local_gguf_models,
+        discover_local_mmproj_files,
+        resolve_local_gguf_path,
+        resolve_mmproj_path_for_model,
+    )
+
 # for configuration
 dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
 
@@ -244,15 +259,8 @@ class WanVideoPromptGenerator:
         local_models = []
         mmproj_files = []
         try:
-            models_dir = os.path.join(folder_paths.models_dir, "LLM")
-            if os.path.exists(models_dir):
-                gguf_files = [f for f in os.listdir(models_dir) 
-                             if f.endswith('.gguf') and 'qwen' in f.lower() and not f.startswith('mmproj')]
-                local_models = [f"Local: {f}" for f in sorted(gguf_files)]
-                
-                # mmproj
-                mmproj_files = [f for f in os.listdir(models_dir) 
-                               if f.startswith('mmproj') and f.endswith('.gguf')]
+            local_models = [f"Local: {f}" for f in discover_local_gguf_models(qwen_only=True)]
+            mmproj_files = discover_local_mmproj_files()
         except:
             pass
         
@@ -341,29 +349,23 @@ class WanVideoPromptGenerator:
                 # Centralized import path handling
                 from import_utils import ensure_local_import
                 ensure_local_import(__file__)
-                from vision_llm_node import rewrite_prompt_with_gguf
+                from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
                 
                 # Model path retrieval
-                models_dir = os.path.join(folder_paths.models_dir, "LLM")
-                model_path = os.path.join(models_dir, model_filename)
+                model_path = resolve_local_gguf_path(model_filename)
                 
                 # mmproj processing (same logic as Vision LLM Node)
-                mmproj_path = None
                 if mmproj is None:
                     raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
-                
-                if mmproj not in ["(Auto-detect)", "(Not required)"]:
-                    # User specified a specific mmproj file
-                    mmproj_path = os.path.normpath(os.path.join(models_dir, mmproj))
-                    if not os.path.exists(mmproj_path):
-                        print(f'[Wan Video Prompt] Warning: mmproj not found: {mmproj_path}')
-                        mmproj_path = None  # Fall back to auto-detect
-                # else: mmproj_path remains None (auto-detect or not required)
+
+                mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj)
                 
                 # preparation
                 pil_images = None
                 if task_internal == "i2v" and image is not None:
                     pil_images = tensor2pil(image)
+                elif task_internal == "i2v":
+                    raise ValueError("Image input is required for Image-to-Video task!")
                 
                 # configuration
                 original_lang = get_caption_language(prompt)
@@ -372,36 +374,19 @@ class WanVideoPromptGenerator:
                 else:
                     lang = target_language
                 
-                # hint addition
-                if lang == "zh":
-                    prompt_with_hint = f"[请用中文输出] {prompt}"
-                elif lang == "en":
-                    prompt_with_hint = f"[Please output in English] {prompt}"
-                else:
-                    prompt_with_hint = prompt
-                
-                # selection
-                if task_internal == "i2v":
-                    system_prompt = WAN_I2V_SYSTEM_PROMPT_ZH if lang == 'zh' else WAN_I2V_SYSTEM_PROMPT_EN
-                else:
-                    system_prompt = WAN_T2V_SYSTEM_PROMPT_ZH if lang == 'zh' else WAN_T2V_SYSTEM_PROMPT_EN
-                
                 print(f'[Wan2.2 Prompt Rewriter] Using Local model')
                 print(f'[Wan2.2 Prompt Rewriter] Model: {model_filename}')
                 print(f'[Wan2.2 Prompt Rewriter] mmproj: {mmproj}')
                 print(f'[Wan2.2 Prompt Rewriter] Task: {task_type}')
-                
-                # Complete construction
-                full_prompt = f"{system_prompt}\n\nUser Input: {prompt_with_hint}\n\nRewritten Prompt:"
-                
+
                 # Convert device selection to n_gpu_layers
                 n_gpu_layers = -1 if device == "GPU" else 0
                 
                 output_prompt = rewrite_prompt_with_gguf(
-                    prompt=full_prompt,
+                    prompt=prompt,
                     model_path=model_path,
                     mmproj_path=mmproj_path,
-                    style="default",  # style
+                    style="wan_i2v" if task_internal == "i2v" else "wan_t2v",
                     target_language=lang,
                     images=pil_images,
                     max_tokens=2048,

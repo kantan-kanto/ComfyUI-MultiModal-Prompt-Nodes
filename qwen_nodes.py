@@ -30,6 +30,21 @@ import comfy.utils
 import numpy as np
 from PIL import Image
 
+try:
+    from .local_gguf_utils import (
+        discover_local_gguf_models,
+        discover_local_mmproj_files,
+        resolve_local_gguf_path,
+        resolve_mmproj_path_for_model,
+    )
+except ImportError:
+    from local_gguf_utils import (
+        discover_local_gguf_models,
+        discover_local_mmproj_files,
+        resolve_local_gguf_path,
+        resolve_mmproj_path_for_model,
+    )
+
 dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
 
 key_path = os.path.join(folder_paths.get_folder_paths("custom_nodes")[0], "ComfyUI-MultiModal-Prompt-Nodes", "api_key.txt")
@@ -383,15 +398,8 @@ class QwenImageEditPromptGenerator:
         local_models = []
         mmproj_files = []
         try:
-            models_dir = os.path.join(folder_paths.models_dir, "LLM")
-            if os.path.exists(models_dir):
-                gguf_files = [f for f in os.listdir(models_dir) 
-                             if f.endswith('.gguf') and 'qwen' in f.lower() and not f.startswith('mmproj')]
-                local_models = [f"Local: {f}" for f in sorted(gguf_files)]
-                
-                # mmproj
-                mmproj_files = [f for f in os.listdir(models_dir) 
-                               if f.startswith('mmproj') and f.endswith('.gguf')]
+            local_models = [f"Local: {f}" for f in discover_local_gguf_models(qwen_only=True)]
+            mmproj_files = discover_local_mmproj_files()
         except:
             pass
         
@@ -479,24 +487,16 @@ class QwenImageEditPromptGenerator:
                 # Centralized import path handling
                 from import_utils import ensure_local_import
                 ensure_local_import(__file__)
-                from vision_llm_node import rewrite_prompt_with_gguf
+                from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
                 
                 # Model path retrieval
-                models_dir = os.path.join(folder_paths.models_dir, "LLM")
-                model_path = os.path.join(models_dir, model_filename)
+                model_path = resolve_local_gguf_path(model_filename)
                 
                 # mmproj processing (same logic as Vision LLM Node)
-                mmproj_path = None
                 if mmproj is None:
                     raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
-                
-                if mmproj not in ["(Auto-detect)", "(Not required)"]:
-                    # User specified a specific mmproj file
-                    mmproj_path = os.path.normpath(os.path.join(models_dir, mmproj))
-                    if not os.path.exists(mmproj_path):
-                        print(f'[Qwen Image Edit] Warning: mmproj not found: {mmproj_path}')
-                        mmproj_path = None  # Fall back to auto-detect
-                # else: mmproj_path remains None (auto-detect or not required)
+
+                mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj)
                 
                 print(f'[Qwen Prompt Rewriter] Using Local model')
                 print(f'[Qwen Prompt Rewriter] Model: {model_filename}')
@@ -510,7 +510,7 @@ class QwenImageEditPromptGenerator:
                     prompt=prompt,
                     model_path=model_path,
                     mmproj_path=mmproj_path,
-                    style="default",
+                    style="qwen_image" if prompt_style == "Qwen-Image" else "qwen_image_edit",
                     target_language=target_language,
                     images=all_images,
                     max_tokens=512,
