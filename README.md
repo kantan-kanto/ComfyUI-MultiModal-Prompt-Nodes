@@ -1,13 +1,34 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.8
+**Version:** 1.0.9
 **License:** GPL-3.0
 
 Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **Qwen-Image-Edit** and **Wan2.2**.  
 Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL) and **Qwen API** for image and video prompt generation and enhancement.
 
 ---
+## Upgrade Notes for Existing Users
 
+The following notes are intended for existing users upgrading to `1.0.9`.
+
+### ローカル Qwen 系 GGUF モデルの探索対象を拡張とそれに伴うアップデート後の初回実行時にモデルの選択し直し要求
+`models/LLM` に加えて `models/text_encoders` とそのサブディレクトリもggufファイルの探索対象に追加しました。これによりシステム内部でのパスの扱いが変わるので、アップデート後の初回実行時にモデルの選択し直しが必要になります。
+
+### Qwen2.5-VLでもQwen Image Edit Prompt Generatorで適切なプロンプト生成
+これまでシステムプロンプトの適用にバグがあったためQwen2.5-VLではQwen Image Edit Prompt Generatorで適切な出力が得られませんでした。v1.0.9でバグ修正、システムプロンプト強化を行っており、より適切な出力が得られるようになっています。
+
+### Vision Input Compatibility
+Starting from **v1.0.8**, image input for **Qwen2.5-VL** is now available in **version 0.3.16 of llama-cpp-python(official)**.
+Vision input support varies by model and llama-cpp-python version. See Installation section for detailed compatibility information. Results may vary based on your specific environment.
+
+~~**Recommendation:** Use **Qwen API** or **Qwen3-VL** with Qwen-Image-Edit. **Qwen2.5-VL** currently shows insufficient adherence to user prompts under the existing system prompt configuration.~~
+
+### Local GGUF Model Stability
+Starting from **v1.0.6**, internal GGUF model handling has been improved to ensure stable behavior
+when switching between different Qwen3-VL models (e.g. 8B ↔ 4B), with mmproj files now being
+properly reloaded as part of the model switching process.
+
+---
 ## Important Notes
 
 ### Language Recommendation for Optimal Results
@@ -15,18 +36,8 @@ Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **signifi
 
 **Recommendation:** Set `target_language` to **"zh"** (Chinese) for best results with these models, even if your input is in English. The models will generate more coherent and instruction-following outputs.
 
-### Vision Input Compatibility
-Starting from **v1.0.8**, image input for **Qwen2.5-VL** is now available in **version 0.3.16 of llama-cpp-python(official)**.
-Vision input support varies by model and llama-cpp-python version. See Installation section for detailed compatibility information. Results may vary based on your specific environment.
 
-**Recommendation:** Use **Qwen API** or **Qwen3-VL** with Qwen-Image-Edit. **Qwen2.5-VL** currently shows insufficient adherence to user prompts under the existing system prompt configuration.
 
-### Local GGUF Model Stability
-Starting from **v1.0.6**, internal GGUF model handling has been improved to ensure stable behavior
-when switching between different Qwen3-VL models (e.g. 8B ↔ 4B), with mmproj files now being
-properly reloaded as part of the model switching process.
-
-These changes are internal and do **not** affect node interfaces or workflows.
 
 ---
 
@@ -104,7 +115,7 @@ Please follow the build and installation instructions provided in the JamePeng f
 
 ### 4. Place Models
 
-Place your GGUF models in `ComfyUI/models/LLM/`:
+Place your GGUF models in `ComfyUI/models/LLM/` or `ComfyUI/models/text_encoders/`:
 ```
 ComfyUI/models/LLM/
 ├── Qwen2.5VL-7B-F16_0.gguf
@@ -239,7 +250,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 ### Qwen2.5-VL (Separate mmproj)
 - ✅ Qwen2.5-VL(3B/7B): Full vision support
 - ✅ Requires matching mmproj file
-- ❌ Insufficient adherence to user prompts under the existing system prompt configuration with **Qwen-Image-Edit**
+- ~~❌ Insufficient adherence to user prompts under the existing system prompt configuration with **Qwen-Image-Edit**~~
 
 ### Qwen3-VL (Separate mmproj)
 - ✅ Qwen3-VL(4B/8B): Full vision support with JamePeng fork
@@ -267,12 +278,18 @@ A: Ensure you're using llama-cpp-python 0.3.21+ (JamePeng fork). Version 0.3.16 
 
 ### Runtime Issues
 
+**Q: v1.0.9にアップデートしたら「Value not in list: llm_model: 'Local:」というエラーがでます。**
+A: gguf（およびmmproj）を選択し直してみて下さい。v1.0.9で`models/LLM` に加えて `models/text_encoders` とそのサブディレクトリもggufファイルの探索対象に追加しました。この結果、システム内部でのパスの扱いが変わったためアップデート後の初回実行時にgguf（およびmmproj）の選択し直しが必要になります。
+
+**Q: Qwen Image Edit Prompt GeneratorでQwen2.5-VLを使ったところ適切な出力が得られません。**
+A: システムプロンプトの適用にバグがありました。v1.0.9でバグ修正し、システムプロンプト強化を、より適切な出力が得られるようになっています。
+
 **Q: "mmproj not specified" error**  
 A: Select an mmproj file (or choose `(Auto-detect)`) in the mmproj dropdown for local models
 
 **Q: "No models found" in model dropdown**  
 A: 
-1. Place GGUF models in `ComfyUI/models/LLM/`
+1. Place GGUF models in `ComfyUI/models/LLM/` or `ComfyUI/models/text_encoders/`
 2. Restart ComfyUI
 3. Verify file extensions are `.gguf`
 

@@ -2,18 +2,38 @@
 
 All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.9] - 2026-03-15
+
+- ローカル Qwen 系 GGUF モデルの探索対象を拡張
+
+  - `models/LLM` に加えて `models/text_encoders` とそのサブディレクトリも探索対象に追加
+  - モデルパス解決と mmproj 解決処理を `local_gguf_utils.py` に共通化し、重複実装を整理
+
+- mmproj 選択まわりを改善
+  - GGUF モデル選択時に、同じディレクトリにある mmproj ファイルのみを UI の候補として表示
+  - `mmproj = (Not required)` 指定時は明示的に text-only モードへ切り替え、不要な vision handler の利用を防止
+
+- Qwen / Wan のローカル prompt rewrite フローを強化
+  - `qwen_image` / `qwen_image_edit` / `wan_t2v` / `wan_i2v` の専用 system prompt を追加
+  - 分析文や見出し付きの冗長な応答を抑え、最終プロンプト本文のみを返しやすくなるよう指示を強化
+  - 中国語出力要求時に英語などが返った場合、引用テキストを保護したうえで簡体字へ正規化する second pass を追加
+
+- Qwen Image Edit Prompt Generator を拡張
+  - `image` 入力を任意化し、`Qwen-Image` を画像なしのテキスト生成用途でも利用可能に変更
+  - `Qwen-Image` をローカルモデルで画像なし実行する場合は mmproj を不要として扱うよう改善
+  - ローカル推論時の `max_tokens` と `n_ctx` を引き上げ、長めのプロンプト生成に対応
+  
+- Wan Video Prompt Generator の堅牢性を向上
+  - Image-to-Video で画像未入力時に明示的なエラーを返すよう改善
 
 ## [1.0.8] - 2026-02-09
 
 - Fixed issue where `Qwen2.5-VL` were always loaded in text-only mode even when a valid mmproj file was specified.
-
   - Added vision chat handler support for `Qwen2.5-VL`
   - Enable vision mode automatically when supported model + mmproj are present
 
 - Improved mmproj auto-detection logic
-
   - Auto-detect now selects mmproj files based on model family prefix (qwen2, qwen3) instead of arbitrary alphabetical fallback
   - Prevents incorrect mmproj selection when multiple mmproj files exist in the same directory
 
