@@ -121,7 +121,18 @@ Your task:
 
 Transform the input into an inspiring, imaginative prompt.""",
 
-    "raw": """You are a helpful assistant. Respond to the user's input directly and naturally."""
+    "raw": """You are a helpful assistant. Respond to the user's input directly and naturally.""",
+
+    "zh_normalize": """你是简体中文规范化助手。
+
+你的任务：
+1. 将用户提供的内容改写为自然、准确、流畅的简体中文。
+2. 只输出最终正文，不要解释，不要标题，不要列表，不要代码块，不要对用户说话。
+3. 严禁输出日文假名、日文句式、英文说明或英文总结。
+4. 保留所有形如 __QTXT_n__ 或 __WTXT_n__ 的占位符，必须逐字原样保留，不得翻译、改写、拆分、删除或新增。
+5. 不要改变原意；如果内容本身已经是合适的简体中文，只做必要的最小修正。
+
+只输出规范化后的简体中文正文。"""
 }
 
 QWEN_IMAGE_SYSTEM_PROMPT_ZH = '''
@@ -326,8 +337,11 @@ WAN_I2V_SYSTEM_PROMPT_ZH = '''
 5. 保持与输入图像的视觉一致性；
 6. 输出为中文，描述自然流畅，突出动作和运动；
 7. 视频长度通常为5-10秒，描述应该覆盖整个时间范围的变化。
+8. 分析过程只在内部完成，不要在输出中展示分析步骤或推理过程。
+9. 最终输出必须只包含视频提示词正文，不要添加标题、分节、项目符号、代码块、说明、前言、后记、总结或致用户的话。
+10. 禁止输出“输入图像分析”“用户描述分析”“优化后的视频提示词”“优化要点”等类似结构化栏目。
 
-请基于输入图像和用户描述生成优化后的视频提示词。
+请基于输入图像和用户描述生成优化后的视频提示词，只输出最终的视频提示词正文。
 '''
 
 WAN_I2V_SYSTEM_PROMPT_EN = '''
@@ -341,8 +355,11 @@ Task Requirements:
 5. Maintain visual consistency with the input image;
 6. Output in English with natural and fluent descriptions, highlighting actions and movements;
 7. Videos are typically 5-10 seconds long; descriptions should cover changes throughout the entire time range.
+8. Perform analysis internally only; do not reveal analysis steps, reasoning, or observations in the output.
+9. The final output must contain only the video prompt body, with no headings, bullet points, code blocks, explanations, prefatory text, closing remarks, or user-facing commentary.
+10. Do not output structured sections such as "Image Analysis", "User Description Analysis", "Optimized Video Prompt", or "Key Points".
 
-Please generate an optimized video prompt based on the input image and user description.
+Please generate an optimized video prompt based on the input image and user description. Output only the final video prompt body.
 '''
 
 # ============================================================================
@@ -432,9 +449,9 @@ def build_special_prompt(style: str, prompt: str, lang: str) -> tuple[str, str]:
         raise ValueError(f"Unsupported special prompt style: {style}")
 
     if lang == "zh":
-        prompt = f"[请用中文输出] {prompt}"
+        prompt = f"[请仅使用简体中文输出。禁止输出英文；除非用户明确要求保留的原文如此，否则不要使用英文单词、英文标题或英文说明。只输出最终结果，不要解释。] {prompt}"
     elif lang == "en":
-        prompt = f"[Please output in English] {prompt}"
+        prompt = f"[Please output in English only. Output only the final result without explanation.] {prompt}"
 
     return system_prompt, f"{system_prompt}\n\nUser Input: {prompt}\n\nRewritten Prompt:"
 
@@ -640,7 +657,11 @@ class GGUFModelManager:
         use_vision = False
         chat_handler = None
 
-        if is_qwen2 and QWEN2_AVAILABLE:
+        if force_no_mmproj:
+            print("[GGUFModelManager] Text-only mode forced: mmproj not required")
+            chat_handler = None
+            use_vision = False
+        elif is_qwen2 and QWEN2_AVAILABLE:
             if mmproj_path is not None and os.path.exists(mmproj_path):
                 try:
                     print(f"[GGUFModelManager] Qwen2.5-VL with mmproj: {mmproj_path}")

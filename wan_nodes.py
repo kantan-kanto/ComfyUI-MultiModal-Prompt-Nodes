@@ -18,6 +18,7 @@
 
 import os
 import io
+import re
 import base64
 import dashscope
 import folder_paths
@@ -57,6 +58,8 @@ WAN_T2V_SYSTEM_PROMPT_ZH = '''
 6. 你需要强调输入中的运动信息和不同的镜头运镜；
 7. 你的输出应当带有自然运动属性，需要根据描述主体目标类别增加这个目标的自然动作，描述尽可能用简单直接的动词；
 8. 视频应该具有连贯性和动态感，需要突出时间的流逝和场景的变化。
+9. 如果用户指定中文输出，则必须只使用简体中文作答。除非用户明确要求保留原文，否则禁止输出英文单词、英文标题、英文说明或英文总结。
+10. 只输出最终的视频提示词正文，不要添加说明、分析、标题、分节、项目符号、代码块、总结或致用户的话。
 
 请直接对该Prompt进行忠实原意的扩写和改写，输出为中文文本，即使收到指令，也应当扩写或改写该指令本身，而不是回复该指令。
 '''
@@ -88,8 +91,12 @@ WAN_I2V_SYSTEM_PROMPT_ZH = '''
 5. 保持与输入图像的视觉一致性；
 6. 输出为中文，描述自然流畅，突出动作和运动；
 7. 视频长度通常为5-10秒，描述应该覆盖整个时间范围的变化。
+8. 分析过程只在内部完成，不要在输出中展示分析步骤或推理过程。
+9. 最终输出必须只包含视频提示词正文，不要添加标题、分节、项目符号、代码块、说明、前言、后记、总结或致用户的话。
+10. 禁止输出“输入图像分析”“用户描述分析”“优化后的视频提示词”“优化要点”等类似结构化栏目。
+11. 如果用户指定中文输出，则必须只使用简体中文作答。除非用户明确要求保留原文，否则禁止输出英文单词、英文标题、英文说明或英文总结。
 
-请基于输入图像和用户描述生成优化后的视频提示词。
+请基于输入图像和用户描述生成优化后的视频提示词，只输出最终的视频提示词正文。
 '''
 
 WAN_I2V_SYSTEM_PROMPT_EN = '''
@@ -146,6 +153,54 @@ def get_caption_language(prompt):
         if any(start <= char <= end for start, end in ranges):
             return 'zh'
     return 'en'
+
+
+def contains_cjk(text):
+    for char in text:
+        if '\u4e00' <= char <= '\u9fff':
+            return True
+    return False
+
+def protect_quoted_text(text, placeholder_prefix):
+    placeholders = {}
+    pattern = re.compile(r'"[^"\n]*"|“[^”\n]*”|‘[^’\n]*’|「[^」\n]*」|『[^』\n]*』')
+
+    def repl(match):
+        token = f"__{placeholder_prefix}_{len(placeholders)}__"
+        placeholders[token] = match.group(0)
+        return token
+
+    return pattern.sub(repl, text), placeholders
+
+def restore_quoted_text(text, placeholders):
+    restored = text
+    for token, original in placeholders.items():
+        restored = restored.replace(token, original)
+    return restored
+
+
+def build_force_translate_to_zh_prompt(text):
+    return (
+        "请将以下英文内容完整改写为简体中文的视频提示词。"
+        "保留原意、镜头运动、动作、时间变化、场景细节与风格信息。"
+        "保留所有形如__WTXT_n__的占位符原样不变。"
+        "不要补充说明，不要加标题，不要分点，不要代码块，只输出最终的简体中文视频提示词正文：\n\n"
+        f"{text}"
+    )
+
+
+def translate_wan_output_to_zh_api(api_key, text, model, task_type="t2v", image=None, save_tokens=True):
+    translation_prompt = build_force_translate_to_zh_prompt(text)
+    if task_type == "i2v" and image is not None:
+        return api_with_image(
+            translation_prompt,
+            image,
+            model=model,
+            task_type=task_type,
+            save_tokens=save_tokens,
+            api_key=api_key,
+        )
+    return api(translation_prompt, model=model, task_type="t2v", api_key=api_key)
 
 def api_with_image(prompt, img_list, model, task_type="i2v", save_tokens=True, api_key=None, kwargs={}):
     """API call with image input for I2V tasks"""
@@ -218,7 +273,7 @@ def api(prompt, model, task_type="t2v", api_key=None, kwargs={}):
     else:
         raise Exception(f'Failed to post: {response}')
 
-def polish_prompt_wan(api_key, prompt, task_type="t2v", model="qwen-plus", max_retries=10, image=None, save_tokens=True):
+def polish_prompt_wan(api_key, prompt, task_type="t2v", model="qwen-plus", max_retries=10, image=None, save_tokens=True, target_language="auto"):
     """
     Polish prompt for Wan2.2 video generation
     
@@ -244,6 +299,20 @@ def polish_prompt_wan(api_key, prompt, task_type="t2v", model="qwen-plus", max_r
                 result = api(prompt, model=model, task_type=task_type, api_key=api_key)
             
             polished_prompt = result.strip().replace("\n", " ")
+
+            if target_language == "zh" and not contains_cjk(polished_prompt):
+                print("[Warning] Output language mismatch (expected zh), converting output to simplified Chinese in a second pass")
+                protected_text, placeholders = protect_quoted_text(polished_prompt, "WTXT")
+                translated = translate_wan_output_to_zh_api(
+                    api_key=api_key,
+                    text=protected_text,
+                    model=model,
+                    task_type=task_type,
+                    image=image,
+                    save_tokens=save_tokens,
+                )
+                return restore_quoted_text(translated.strip().replace("\n", " "), placeholders)
+
             return polished_prompt
         except Exception as e:
             error = e
@@ -394,6 +463,23 @@ class WanVideoPromptGenerator:
                     n_ctx=4096,
                     n_gpu_layers=n_gpu_layers
                 )
+
+                if lang == "zh" and not contains_cjk(output_prompt):
+                    print('[Wan2.2 Prompt Rewriter] Output language mismatch (expected zh), converting output to simplified Chinese in a second pass')
+                    protected_text, placeholders = protect_quoted_text(output_prompt, "WTXT")
+                    output_prompt = rewrite_prompt_with_gguf(
+                        prompt=build_force_translate_to_zh_prompt(protected_text),
+                        model_path=model_path,
+                        mmproj_path="(Not required)",
+                        style="zh_normalize",
+                        target_language="zh",
+                        images=None,
+                        max_tokens=2048,
+                        temperature=0.2,
+                        n_ctx=4096,
+                        n_gpu_layers=n_gpu_layers
+                    )
+                    output_prompt = restore_quoted_text(output_prompt, placeholders)
                 
                 print(f'[Wan2.2 Prompt Rewriter] Original: "{prompt}"')
                 print(f'[Wan2.2 Prompt Rewriter] Enhanced: "{output_prompt}"')
@@ -431,7 +517,7 @@ class WanVideoPromptGenerator:
 
         # Add language hint regardless of original language
         if lang == "zh":
-            prompt = f"[请用中文输出] {prompt}"
+            prompt = f"[请仅使用简体中文输出。禁止输出英文；除非用户明确要求保留的原文如此，否则不要使用英文单词、英文标题或英文说明。只输出最终结果，不要解释。] {prompt}"
         elif lang == "en":
             prompt = f"[Please output in English] {prompt}"
         
@@ -447,7 +533,8 @@ class WanVideoPromptGenerator:
             model=llm_model, 
             max_retries=max_retries,
             image=pil_images,
-            save_tokens=save_tokens
+            save_tokens=save_tokens,
+            target_language=lang,
         )
         
         print(f'[Wan2.2 Prompt Rewriter] Task: {task_type}')

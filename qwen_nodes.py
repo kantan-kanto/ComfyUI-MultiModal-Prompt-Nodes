@@ -20,6 +20,7 @@ import os
 import io
 import math
 import json
+import re
 import torch
 import base64
 import dashscope
@@ -249,6 +250,55 @@ def get_caption_language(prompt):
             return 'zh'
     return 'en'
 
+def contains_cjk(text):
+    for char in text:
+        if '\u4e00' <= char <= '\u9fff':
+            return True
+    return False
+
+def contains_japanese(text):
+    for char in text:
+        if ('\u3040' <= char <= '\u309f') or ('\u30a0' <= char <= '\u30ff') or ('\uff66' <= char <= '\uff9f'):
+            return True
+    return False
+
+def is_acceptable_zh_output(text):
+    return contains_cjk(text) and not contains_japanese(text)
+
+def protect_quoted_text(text, placeholder_prefix):
+    placeholders = {}
+    pattern = re.compile(r'"[^"\n]*"|“[^”\n]*”|‘[^’\n]*’|「[^」\n]*」|『[^』\n]*』')
+
+    def repl(match):
+        token = f"__{placeholder_prefix}_{len(placeholders)}__"
+        placeholders[token] = match.group(0)
+        return token
+
+    return pattern.sub(repl, text), placeholders
+
+def restore_quoted_text(text, placeholders):
+    restored = text
+    for token, original in placeholders.items():
+        restored = restored.replace(token, original)
+    return restored
+
+def build_force_translate_to_zh_prompt(text, prompt_style):
+    if prompt_style == "Qwen-Image-Edit":
+        return (
+            "请将以下内容完整改写为简体中文的图像编辑提示词。"
+            "保持原意、编辑目标、位置、数量、风格和约束不变。"
+            "保留所有形如__QTXT_n__的占位符原样不变。"
+            "只输出最终的简体中文编辑提示词正文，不要解释，不要标题，不要代码块：\n\n"
+            f"{text}"
+        )
+    return (
+        "请将以下内容完整改写为简体中文的图像生成提示词。"
+        "保持原意、主体、风格、构图、文字内容和细节不变。"
+        "保留所有形如__QTXT_n__的占位符原样不变。"
+        "只输出最终的简体中文提示词正文，不要解释，不要标题，不要代码块：\n\n"
+        f"{text}"
+    )
+
 def api_edit(prompt, img_list, model="qwen-vl-max-latest", save_tokens=True, api_key=None, kwargs={}):
     if not api_key:
         raise EnvironmentError("API_KEY is not set!")
@@ -322,6 +372,17 @@ def polish_prompt_edit(api_key, prompt, img, model="qwen-vl-max-latest", max_ret
                 result = json.loads(result)
                 
             polished_prompt = result['Rewritten'].strip().replace("\n", " ")
+
+            if lang == "zh" and not is_acceptable_zh_output(polished_prompt):
+                print("[Warning] Output language mismatch (expected simplified Chinese), converting output to simplified Chinese in a second pass")
+                protected_text, placeholders = protect_quoted_text(polished_prompt, "QTXT")
+                translated = api(
+                    build_force_translate_to_zh_prompt(protected_text, "Qwen-Image-Edit"),
+                    model=model,
+                    api_key=api_key,
+                )
+                polished_prompt = restore_quoted_text(translated.strip().replace("\n", " "), placeholders)
+
             return polished_prompt
         except Exception as e:
             error = e
@@ -383,6 +444,17 @@ def polish_prompt(api_key, prompt, model="qwen-plus", max_retries=10, target_lan
         try:
             result = api(prompt_text, model=model, api_key=api_key)
             polished_prompt = result.strip().replace("\n", " ")
+
+            if lang == "zh" and not is_acceptable_zh_output(polished_prompt):
+                print("[Warning] Output language mismatch (expected simplified Chinese), converting output to simplified Chinese in a second pass")
+                protected_text, placeholders = protect_quoted_text(polished_prompt, "QTXT")
+                translated = api(
+                    build_force_translate_to_zh_prompt(protected_text, "Qwen-Image"),
+                    model=model,
+                    api_key=api_key,
+                )
+                polished_prompt = restore_quoted_text(translated.strip().replace("\n", " "), placeholders)
+
             return polished_prompt + magic_prompt
         except Exception as e:
             error = e
@@ -420,7 +492,6 @@ class QwenImageEditPromptGenerator:
         
         return {
             "required": {
-                "image": ("IMAGE",),
                 "prompt": ("STRING", {"multiline": True}),
                 "prompt_style": (["Qwen-Image-Edit", "Qwen-Image"], {
                     "default": "Qwen-Image-Edit", 
@@ -452,6 +523,7 @@ class QwenImageEditPromptGenerator:
                 }), 
             },
             "optional": {
+                "image": ("IMAGE",),
                 "image2": ("IMAGE",),
                 "image3": ("IMAGE",),
             }
@@ -463,10 +535,11 @@ class QwenImageEditPromptGenerator:
     CATEGORY = "multimodal/prompt"
     DESCRIPTION = "Enhance your prompts using the Qwen LLM to align the behavior and capabilities of the Qwen-Image/Edit online version."
     
-    def rewrit(self, image, prompt, prompt_style, target_language, llm_model, mmproj, max_retries, device, save_tokens, image2=None, image3=None):
+    def rewrit(self, prompt, prompt_style, target_language, llm_model, mmproj, max_retries, device, save_tokens, image=None, image2=None, image3=None):
         # Collect all images
         all_images = []
-        all_images.extend(tensor2pil(image))
+        if image is not None:
+            all_images.extend(tensor2pil(image))
         if image2 is not None:
             all_images.extend(tensor2pil(image2))
         if image3 is not None:
@@ -496,11 +569,16 @@ class QwenImageEditPromptGenerator:
                 if mmproj is None:
                     raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
 
-                mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj)
+                if prompt_style == "Qwen-Image" and len(all_images) == 0:
+                    mmproj_selection = "(Not required)"
+                else:
+                    mmproj_selection = mmproj
+
+                mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj_selection)
                 
                 print(f'[Qwen Prompt Rewriter] Using Local model')
                 print(f'[Qwen Prompt Rewriter] Model: {model_filename}')
-                print(f'[Qwen Prompt Rewriter] mmproj: {mmproj}')
+                print(f'[Qwen Prompt Rewriter] mmproj: {mmproj_selection}')
                 print(f'[Qwen Prompt Rewriter] Using {len(all_images)} image(s)')
                 
                 # Convert device selection to n_gpu_layers
@@ -513,11 +591,29 @@ class QwenImageEditPromptGenerator:
                     style="qwen_image" if prompt_style == "Qwen-Image" else "qwen_image_edit",
                     target_language=target_language,
                     images=all_images,
-                    max_tokens=512,
+                    max_tokens=2048,
                     temperature=0.7,
+                    n_ctx=4096,
                     n_gpu_layers=n_gpu_layers,
                 )
-                
+
+                if target_language == "zh" and not is_acceptable_zh_output(output_prompt):
+                    print('[Qwen Prompt Rewriter] Output language mismatch (expected simplified Chinese), converting output to simplified Chinese in a second pass')
+                    protected_text, placeholders = protect_quoted_text(output_prompt, "QTXT")
+                    output_prompt = rewrite_prompt_with_gguf(
+                        prompt=build_force_translate_to_zh_prompt(protected_text, prompt_style),
+                        model_path=model_path,
+                        mmproj_path="(Not required)",
+                        style="zh_normalize",
+                        target_language="zh",
+                        images=None,
+                        max_tokens=2048,
+                        temperature=0.2,
+                        n_ctx=4096,
+                        n_gpu_layers=n_gpu_layers,
+                    )
+                    output_prompt = restore_quoted_text(output_prompt, placeholders)
+                 
             except Exception as e:
                 raise RuntimeError(f"Local model error: {str(e)}")
         
