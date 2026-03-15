@@ -11,11 +11,11 @@ Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL) and **Qwen API
 
 The following notes are intended for existing users upgrading to `1.0.9`.
 
-### ローカル Qwen 系 GGUF モデルの探索対象を拡張とそれに伴うアップデート後の初回実行時にモデルの選択し直し要求
-`models/LLM` に加えて `models/text_encoders` とそのサブディレクトリもggufファイルの探索対象に追加しました。これによりシステム内部でのパスの扱いが変わるので、アップデート後の初回実行時にモデルの選択し直しが必要になります。
+### Expanded search paths for local Qwen-family GGUF models
+In addition to `models/LLM`, this release now searches `models/text_encoders` and its subdirectories for GGUF files. Because this changes how model paths are handled internally, you may need to reselect your models the first time you run the node after updating.
 
-### Qwen2.5-VLでもQwen Image Edit Prompt Generatorで適切なプロンプト生成
-これまでシステムプロンプトの適用にバグがあったためQwen2.5-VLではQwen Image Edit Prompt Generatorで適切な出力が得られませんでした。v1.0.9でバグ修正、システムプロンプト強化を行っており、より適切な出力が得られるようになっています。
+### Improved prompt generation for Qwen2.5-VL in Qwen Image Edit Prompt Generator
+There was previously a bug in how the system prompt was applied, which prevented Qwen2.5-VL from producing appropriate output in Qwen Image Edit Prompt Generator. In v1.0.9, this has been fixed and the system prompts have been strengthened, resulting in more reliable output.
 
 ### Vision Input Compatibility
 Starting from **v1.0.8**, image input for **Qwen2.5-VL** is now available in **version 0.3.16 of llama-cpp-python(official)**.
@@ -35,9 +35,6 @@ properly reloaded as part of the model switching process.
 Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **significantly better to Chinese prompts than English prompts**. 
 
 **Recommendation:** Set `target_language` to **"zh"** (Chinese) for best results with these models, even if your input is in English. The models will generate more coherent and instruction-following outputs.
-
-
-
 
 ---
 
@@ -229,7 +226,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 - For I2V tasks, use `qwen-vl-*` models
 
 **Example T2V workflow:**
-1. Enter prompt: "一只猫在窗台上看风景" (A cat looking at scenery on a windowsill)
+1. Enter prompt: "A cat looking out from a windowsill"
 2. Set `task_type`: Text-to-Video
 3. Set `target_language`: zh
 4. Select model (local or API)
@@ -237,7 +234,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 
 **Example I2V workflow:**
 1. Attach input image
-2. Enter motion description: "镜头慢慢推进" (Camera slowly zooms in)
+2. Enter motion description: "The camera slowly pushes in"
 3. Set `task_type`: Image-to-Video
 4. Set `target_language`: zh
 5. Ensure model supports vision (qwen-vl-*)
@@ -278,11 +275,11 @@ A: Ensure you're using llama-cpp-python 0.3.21+ (JamePeng fork). Version 0.3.16 
 
 ### Runtime Issues
 
-**Q: v1.0.9にアップデートしたら「Value not in list: llm_model: 'Local:」というエラーがでます。**
-A: gguf（およびmmproj）を選択し直してみて下さい。v1.0.9で`models/LLM` に加えて `models/text_encoders` とそのサブディレクトリもggufファイルの探索対象に追加しました。この結果、システム内部でのパスの扱いが変わったためアップデート後の初回実行時にgguf（およびmmproj）の選択し直しが必要になります。
+**Q: After updating to v1.0.9, I get an error like `Value not in list: llm_model: 'Local:'`.**  
+A: Try reselecting your GGUF model and mmproj file. In v1.0.9, the GGUF search paths were expanded to include `models/text_encoders` and its subdirectories in addition to `models/LLM`. As a result, internal model paths may change, and the first run after updating may require you to select the GGUF model and mmproj again.
 
-**Q: Qwen Image Edit Prompt GeneratorでQwen2.5-VLを使ったところ適切な出力が得られません。**
-A: システムプロンプトの適用にバグがありました。v1.0.9でバグ修正し、システムプロンプト強化を、より適切な出力が得られるようになっています。
+**Q: Qwen Image Edit Prompt Generator does not produce appropriate output when I use Qwen2.5-VL.**  
+A: There was a bug in how the system prompt was applied. This was fixed in v1.0.9, and the system prompts were also improved to produce more appropriate output.
 
 **Q: "mmproj not specified" error**  
 A: Select an mmproj file (or choose `(Auto-detect)`) in the mmproj dropdown for local models
@@ -450,6 +447,9 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.8
-- Fixed issue where `Qwen2.5-VL` were always loaded in text-only mode even when a valid mmproj file was specified.
-- Improved mmproj auto-detection logic.
+### Current Version: 1.0.9
+- Expanded the search scope for local Qwen-family GGUF models
+- Improved mmproj selection behavior
+- Strengthened the local prompt rewrite flow for Qwen and Wan
+- Expanded Qwen Image Edit Prompt Generator
+- Improved the robustness of Wan Video Prompt Generator

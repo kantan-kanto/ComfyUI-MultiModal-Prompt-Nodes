@@ -5,27 +5,27 @@ All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in thi
 
 ## [1.0.9] - 2026-03-15
 
-- ローカル Qwen 系 GGUF モデルの探索対象を拡張
+- Expanded the search scope for local Qwen-family GGUF models
 
-  - `models/LLM` に加えて `models/text_encoders` とそのサブディレクトリも探索対象に追加
-  - モデルパス解決と mmproj 解決処理を `local_gguf_utils.py` に共通化し、重複実装を整理
+  - Added `models/text_encoders` and all subdirectories under both `models/LLM` and `models/text_encoders` to the search paths
+  - Centralized model path resolution and mmproj resolution in `local_gguf_utils.py` to reduce duplicated logic
 
-- mmproj 選択まわりを改善
-  - GGUF モデル選択時に、同じディレクトリにある mmproj ファイルのみを UI の候補として表示
-  - `mmproj = (Not required)` 指定時は明示的に text-only モードへ切り替え、不要な vision handler の利用を防止
+- Improved mmproj selection behavior
+  - The UI now shows only mmproj files from the same directory as the selected GGUF model
+  - When `mmproj = (Not required)` is selected, the node now explicitly switches to text-only mode to avoid unnecessary vision handler usage
 
-- Qwen / Wan のローカル prompt rewrite フローを強化
-  - `qwen_image` / `qwen_image_edit` / `wan_t2v` / `wan_i2v` の専用 system prompt を追加
-  - 分析文や見出し付きの冗長な応答を抑え、最終プロンプト本文のみを返しやすくなるよう指示を強化
-  - 中国語出力要求時に英語などが返った場合、引用テキストを保護したうえで簡体字へ正規化する second pass を追加
+- Strengthened the local prompt rewrite flow for Qwen and Wan
+  - Added dedicated system prompts for `qwen_image`, `qwen_image_edit`, `wan_t2v`, and `wan_i2v`
+  - Tightened prompt instructions to reduce verbose analysis-style responses and make it easier to return only the final prompt body
+  - Added a second pass that preserves quoted text and normalizes the result to Simplified Chinese when Chinese output is requested but another language is returned
 
-- Qwen Image Edit Prompt Generator を拡張
-  - `image` 入力を任意化し、`Qwen-Image` を画像なしのテキスト生成用途でも利用可能に変更
-  - `Qwen-Image` をローカルモデルで画像なし実行する場合は mmproj を不要として扱うよう改善
-  - ローカル推論時の `max_tokens` と `n_ctx` を引き上げ、長めのプロンプト生成に対応
+- Expanded Qwen Image Edit Prompt Generator
+  - Made the `image` input optional so `Qwen-Image` can also be used for text-only prompt generation
+  - Treated mmproj as not required when `Qwen-Image` is run locally without images
+  - Increased local inference `max_tokens` and `n_ctx` to better support longer prompt generation
   
-- Wan Video Prompt Generator の堅牢性を向上
-  - Image-to-Video で画像未入力時に明示的なエラーを返すよう改善
+- Improved the robustness of Wan Video Prompt Generator
+  - Added explicit validation errors when Image-to-Video is used without an input image
 
 ## [1.0.8] - 2026-02-09
 
