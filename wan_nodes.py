@@ -401,147 +401,154 @@ class WanVideoPromptGenerator:
     DESCRIPTION = "Enhance your prompts for Wan2.2 video generation using Qwen LLM to create more detailed and expressive video descriptions."
     
     def rewrite(self, prompt, task_type, target_language, llm_model, mmproj, max_retries, device, save_tokens, image=None):
-        # Convert task type to internal format
-        task_internal = "i2v" if task_type == "Image-to-Video" else "t2v"
-        
-        # Local or API model determination
-        if llm_model.startswith("Local: "):
-            # Local model processing (no API key needed)
-            try:
-                model_filename = llm_model.replace("Local: ", "")
-                
-                # vision_llm_node rewrite_prompt_with_gguf import
-                import sys
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                if current_dir not in sys.path:
-                    sys.path.insert(0, current_dir)
-                # Centralized import path handling
-                from import_utils import ensure_local_import
-                ensure_local_import(__file__)
-                from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
-                
-                # Model path retrieval
-                model_path = resolve_local_gguf_path(model_filename)
-                
-                # mmproj processing (same logic as Vision LLM Node)
-                if mmproj is None:
-                    raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
+        try:
+            # Convert task type to internal format
+            task_internal = "i2v" if task_type == "Image-to-Video" else "t2v"
+            
+            # Local or API model determination
+            if llm_model.startswith("Local: "):
+                # Local model processing (no API key needed)
+                try:
+                    model_filename = llm_model.replace("Local: ", "")
+                    
+                    # vision_llm_node rewrite_prompt_with_gguf import
+                    import sys
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    if current_dir not in sys.path:
+                        sys.path.insert(0, current_dir)
+                    # Centralized import path handling
+                    from import_utils import ensure_local_import
+                    ensure_local_import(__file__)
+                    from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
+                    
+                    # Model path retrieval
+                    model_path = resolve_local_gguf_path(model_filename)
+                    
+                    # mmproj processing (same logic as Vision LLM Node)
+                    if mmproj is None:
+                        raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
 
-                mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj)
-                
-                # preparation
-                pil_images = None
-                if task_internal == "i2v" and image is not None:
-                    pil_images = tensor2pil(image)
-                elif task_internal == "i2v":
-                    raise ValueError("Image input is required for Image-to-Video task!")
-                
-                # configuration
-                original_lang = get_caption_language(prompt)
-                if target_language == "auto":
-                    lang = original_lang
-                else:
-                    lang = target_language
-                
-                print(f'[Wan2.2 Prompt Rewriter] Using Local model')
-                print(f'[Wan2.2 Prompt Rewriter] Model: {model_filename}')
-                print(f'[Wan2.2 Prompt Rewriter] mmproj: {mmproj}')
-                print(f'[Wan2.2 Prompt Rewriter] Task: {task_type}')
+                    mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj)
+                    
+                    # preparation
+                    pil_images = None
+                    if task_internal == "i2v" and image is not None:
+                        pil_images = tensor2pil(image)
+                    elif task_internal == "i2v":
+                        raise ValueError("Image input is required for Image-to-Video task!")
+                    
+                    # configuration
+                    original_lang = get_caption_language(prompt)
+                    if target_language == "auto":
+                        lang = original_lang
+                    else:
+                        lang = target_language
+                    
+                    print(f'[Wan2.2 Prompt Rewriter] Using Local model')
+                    print(f'[Wan2.2 Prompt Rewriter] Model: {model_filename}')
+                    print(f'[Wan2.2 Prompt Rewriter] mmproj: {mmproj}')
+                    print(f'[Wan2.2 Prompt Rewriter] Task: {task_type}')
 
-                # Convert device selection to n_gpu_layers
-                n_gpu_layers = -1 if device == "GPU" else 0
-                
-                output_prompt = rewrite_prompt_with_gguf(
-                    prompt=prompt,
-                    model_path=model_path,
-                    mmproj_path=mmproj_path,
-                    style="wan_i2v" if task_internal == "i2v" else "wan_t2v",
-                    target_language=lang,
-                    images=pil_images,
-                    max_tokens=2048,
-                    temperature=0.7,
-                    n_ctx=4096,
-                    n_gpu_layers=n_gpu_layers
-                )
-
-                if lang == "zh" and not contains_cjk(output_prompt):
-                    print('[Wan2.2 Prompt Rewriter] Output language mismatch (expected zh), converting output to simplified Chinese in a second pass')
-                    protected_text, placeholders = protect_quoted_text(output_prompt, "WTXT")
+                    # Convert device selection to n_gpu_layers
+                    n_gpu_layers = -1 if device == "GPU" else 0
+                    
                     output_prompt = rewrite_prompt_with_gguf(
-                        prompt=build_force_translate_to_zh_prompt(protected_text),
+                        prompt=prompt,
                         model_path=model_path,
-                        mmproj_path="(Not required)",
-                        style="zh_normalize",
-                        target_language="zh",
-                        images=None,
+                        mmproj_path=mmproj_path,
+                        style="wan_i2v" if task_internal == "i2v" else "wan_t2v",
+                        target_language=lang,
+                        images=pil_images,
                         max_tokens=2048,
-                        temperature=0.2,
+                        temperature=0.7,
                         n_ctx=4096,
                         n_gpu_layers=n_gpu_layers
                     )
-                    output_prompt = restore_quoted_text(output_prompt, placeholders)
-                
-                print(f'[Wan2.2 Prompt Rewriter] Original: "{prompt}"')
-                print(f'[Wan2.2 Prompt Rewriter] Enhanced: "{output_prompt}"')
-                
-                return (output_prompt,)
-                
-            except Exception as e:
-                raise RuntimeError(f"Local model processing failed: {str(e)}")
-        
-        # API processing (cloud models) - load API key from api_key.txt
-        if not os.path.exists(key_path):
-            raise EnvironmentError(f"API key file not found: {key_path}\nPlease create this file with your Aliyun API key for cloud model usage.")
-        
-        with open(key_path, "r", encoding="utf-8") as f:
-            _api_key = f.read().strip()
-        
-        if not _api_key:
-            raise EnvironmentError(f'API_KEY is not set in "{key_path}"\nPlease add your Aliyun API key to this file for cloud model usage.')
-        
-        # Validate model selection for I2V
-        if task_internal == "i2v":
-            if not llm_model.startswith("qwen-vl"):
-                raise ValueError(f'For Image-to-Video tasks, please use a qwen-vl-* model. Current model: {llm_model}')
-            if image is None:
-                raise ValueError("Image input is required for Image-to-Video task!")
-        
-        # Detect original language
-        original_lang = get_caption_language(prompt)
-        
-        # Determine target language
-        if target_language == "auto":
-            lang = original_lang
-        else:
-            lang = target_language
 
-        # Add language hint regardless of original language
-        if lang == "zh":
-            prompt = f"[请仅使用简体中文输出。禁止输出英文；除非用户明确要求保留的原文如此，否则不要使用英文单词、英文标题或英文说明。只输出最终结果，不要解释。] {prompt}"
-        elif lang == "en":
-            prompt = f"[Please output in English] {prompt}"
-        
-        # Convert image tensor to PIL if needed
-        pil_images = None
-        if task_internal == "i2v" and image is not None:
-            pil_images = tensor2pil(image)
-        
-        output_prompt = polish_prompt_wan(
-            _api_key, 
-            prompt, 
-            task_type=task_internal,
-            model=llm_model, 
-            max_retries=max_retries,
-            image=pil_images,
-            save_tokens=save_tokens,
-            target_language=lang,
-        )
-        
-        print(f'[Wan2.2 Prompt Rewriter] Task: {task_type}')
-        print(f'[Wan2.2 Prompt Rewriter] Original: "{prompt}"')
-        print(f'[Wan2.2 Prompt Rewriter] Enhanced: "{output_prompt}"')
-        
-        return (output_prompt,)
+                    if lang == "zh" and not contains_cjk(output_prompt):
+                        print('[Wan2.2 Prompt Rewriter] Output language mismatch (expected zh), converting output to simplified Chinese in a second pass')
+                        protected_text, placeholders = protect_quoted_text(output_prompt, "WTXT")
+                        output_prompt = rewrite_prompt_with_gguf(
+                            prompt=build_force_translate_to_zh_prompt(protected_text),
+                            model_path=model_path,
+                            mmproj_path="(Not required)",
+                            style="zh_normalize",
+                            target_language="zh",
+                            images=None,
+                            max_tokens=2048,
+                            temperature=0.2,
+                            n_ctx=4096,
+                            n_gpu_layers=n_gpu_layers
+                        )
+                        output_prompt = restore_quoted_text(output_prompt, placeholders)
+                    
+                    print(f'[Wan2.2 Prompt Rewriter] Original: "{prompt}"')
+                    print(f'[Wan2.2 Prompt Rewriter] Enhanced: "{output_prompt}"')
+                    
+                    return (output_prompt,)
+                    
+                except Exception as e:
+                    raise RuntimeError(f"Local model processing failed: {str(e)}")
+            
+            # API processing (cloud models) - load API key from api_key.txt
+            if not os.path.exists(key_path):
+                raise EnvironmentError(f"API key file not found: {key_path}\nPlease create this file with your Aliyun API key for cloud model usage.")
+            
+            with open(key_path, "r", encoding="utf-8") as f:
+                _api_key = f.read().strip()
+            
+            if not _api_key:
+                raise EnvironmentError(f'API_KEY is not set in "{key_path}"\nPlease add your Aliyun API key to this file for cloud model usage.')
+            
+            # Validate model selection for I2V
+            if task_internal == "i2v":
+                if not llm_model.startswith("qwen-vl"):
+                    raise ValueError(f'For Image-to-Video tasks, please use a qwen-vl-* model. Current model: {llm_model}')
+                if image is None:
+                    raise ValueError("Image input is required for Image-to-Video task!")
+            
+            # Detect original language
+            original_lang = get_caption_language(prompt)
+            
+            # Determine target language
+            if target_language == "auto":
+                lang = original_lang
+            else:
+                lang = target_language
+
+            # Add language hint regardless of original language
+            if lang == "zh":
+                prompt = f"[请仅使用简体中文输出。禁止输出英文；除非用户明确要求保留的原文如此，否则不要使用英文单词、英文标题或英文说明。只输出最终结果，不要解释。] {prompt}"
+            elif lang == "en":
+                prompt = f"[Please output in English] {prompt}"
+            
+            # Convert image tensor to PIL if needed
+            pil_images = None
+            if task_internal == "i2v" and image is not None:
+                pil_images = tensor2pil(image)
+            
+            output_prompt = polish_prompt_wan(
+                _api_key, 
+                prompt, 
+                task_type=task_internal,
+                model=llm_model, 
+                max_retries=max_retries,
+                image=pil_images,
+                save_tokens=save_tokens,
+                target_language=lang,
+            )
+            
+            print(f'[Wan2.2 Prompt Rewriter] Task: {task_type}')
+            print(f'[Wan2.2 Prompt Rewriter] Original: "{prompt}"')
+            print(f'[Wan2.2 Prompt Rewriter] Enhanced: "{output_prompt}"')
+            
+            return (output_prompt,)
+        finally:
+            try:
+                from vision_llm_node import cleanup as vision_cleanup
+                vision_cleanup()
+            except Exception:
+                pass
 
 NODE_CLASS_MAPPINGS = {
     "WanVideoPromptGenerator": WanVideoPromptGenerator

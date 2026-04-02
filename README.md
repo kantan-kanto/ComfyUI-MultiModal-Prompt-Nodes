@@ -1,15 +1,15 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.9
+**Version:** 1.0.10
 **License:** GPL-3.0
 
 Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **Qwen-Image-Edit** and **Wan2.2**.  
-Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL) and **Qwen API** for image and video prompt generation and enhancement.
+Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL and Qwen3.5) and **Qwen API** for image and video prompt generation and enhancement.
 
 ---
 ## Upgrade Notes for Existing Users
 
-The following notes are intended for existing users upgrading to `1.0.9`.
+The following notes are intended for existing users upgrading to `1.0.10`.
 
 ### Expanded search paths for local Qwen-family GGUF models
 In addition to `models/LLM`, this release now searches `models/text_encoders` and its subdirectories for GGUF files. Because this changes how model paths are handled internally, you may need to reselect your models the first time you run the node after updating.
@@ -48,7 +48,7 @@ Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **signifi
   - `concise`: Minimal keywords, focused on core elements
   - `creative`: Artistic interpretation with unique perspectives
 - **Multi-image input**: Support batch image input via ComfyUI's batch nodes (e.g., Images Batch Multiple)
-- **Local GGUF support**: Run Qwen2.5-VL and Qwen3-VL models locally
+- **Local GGUF support**: Run Qwen2.5-VL, Qwen3-VL, and Qwen3.5 models locally
 - **Auto-detect mmproj**: Automatic detection or manual selection
 
 ### 2. Qwen Image Edit Prompt Generator
@@ -96,14 +96,15 @@ pip install dashscope pillow numpy
 
 **Important:** Model compatibility varies by llama-cpp-python version. Based on my testing environment:
 
-| Version | Qwen2.5-VL | Qwen3-VL | 
-|---------|------------|----------|
-| 0.3.16 (official) | ✅ | ❌ |
-| 0.3.21+ (JamePeng fork) | ✅ | ✅ |
+| Version | Qwen2.5-VL | Qwen3-VL | Qwen3.5 | 
+|---------|------------|----------|---------|
+| 0.3.16 (official) | ✅ | ❌ | ❌ |
+| 0.3.21+ (JamePeng fork) | ✅ | ✅ | ❌ |
+| 0.3.33+ (JamePeng fork) | ✅ | ✅ | ✅ | 
 
 ***Note:** Vision input support may vary depending on your environment and configuration.
 
-**Recommended Installation (JamePeng fork for Qwen3-VL support):**  
+**Recommended Installation (JamePeng fork for Qwen3-VL and Qwen3.5 support):**  
 Please follow the build and installation instructions provided in the JamePeng fork repository, as this fork requires a custom build and cannot be reliably installed via a simple `pip install`.
 
 **Source:** https://github.com/JamePeng/llama-cpp-python
@@ -168,7 +169,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 ### Qwen Image Edit Prompt Generator
 
 **Inputs:**
-- `image`: Primary input image (required)
+- `image`: Primary input image (optional)
 - `prompt`: Edit instruction or image description
 - `prompt_style`: 
   - `Qwen-Image-Edit`: For image editing tasks
@@ -245,12 +246,16 @@ Add your Alibaba Cloud Dashscope API key to this file.
 ## Model Compatibility
 
 ### Qwen2.5-VL (Separate mmproj)
-- ✅ Qwen2.5-VL(3B/7B): Full vision support
+- ✅ Qwen2.5-VL(3B/7B/32B): Full vision support
 - ✅ Requires matching mmproj file
 - ~~❌ Insufficient adherence to user prompts under the existing system prompt configuration with **Qwen-Image-Edit**~~
 
 ### Qwen3-VL (Separate mmproj)
 - ✅ Qwen3-VL(4B/8B): Full vision support with JamePeng fork
+- ✅ Requires matching mmproj file
+
+### Qwen3.5 (Separate mmproj)
+- ✅ Qwen3.5(9B/27B/35B-A3B): Full vision support with JamePeng fork
 - ✅ Requires matching mmproj file
 
 ### Model Sources
@@ -447,9 +452,6 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.9
-- Expanded the search scope for local Qwen-family GGUF models
-- Improved mmproj selection behavior
-- Strengthened the local prompt rewrite flow for Qwen and Wan
-- Expanded Qwen Image Edit Prompt Generator
-- Improved the robustness of Wan Video Prompt Generator
+### Current Version: 1.0.10
+- Added support for Qwen3.5 local GGUF models
+- Improved post-run cleanup behavior for local model nodes

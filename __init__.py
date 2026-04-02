@@ -6,7 +6,7 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-__version__ = "1.0.8"
+__version__ = "1.0.10"
 WEB_DIRECTORY = "./web"
 
 from .qwen_nodes import NODE_CLASS_MAPPINGS as qNODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS as qNODE_DISPLAY_NAME_MAPPINGS

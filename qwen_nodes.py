@@ -536,115 +536,122 @@ class QwenImageEditPromptGenerator:
     DESCRIPTION = "Enhance your prompts using the Qwen LLM to align the behavior and capabilities of the Qwen-Image/Edit online version."
     
     def rewrit(self, prompt, prompt_style, target_language, llm_model, mmproj, max_retries, device, save_tokens, image=None, image2=None, image3=None):
-        # Collect all images
-        all_images = []
-        if image is not None:
-            all_images.extend(tensor2pil(image))
-        if image2 is not None:
-            all_images.extend(tensor2pil(image2))
-        if image3 is not None:
-            all_images.extend(tensor2pil(image3))
-        
-        # Local model processing
-        if llm_model.startswith("Local: "):
-            try:
+        try:
+            # Collect all images
+            all_images = []
+            if image is not None:
+                all_images.extend(tensor2pil(image))
+            if image2 is not None:
+                all_images.extend(tensor2pil(image2))
+            if image3 is not None:
+                all_images.extend(tensor2pil(image3))
+            
+            # Local model processing
+            if llm_model.startswith("Local: "):
+                try:
 
-                model_filename = llm_model.replace("Local: ", "")
-                
-                # mmproj check
-                # vision_llm_node rewrite_prompt_with_gguf import
-                import sys
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                if current_dir not in sys.path:
-                    sys.path.insert(0, current_dir)
-                # Centralized import path handling
-                from import_utils import ensure_local_import
-                ensure_local_import(__file__)
-                from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
-                
-                # Model path retrieval
-                model_path = resolve_local_gguf_path(model_filename)
-                
-                # mmproj processing (same logic as Vision LLM Node)
-                if mmproj is None:
-                    raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
+                    model_filename = llm_model.replace("Local: ", "")
+                    
+                    # mmproj check
+                    # vision_llm_node rewrite_prompt_with_gguf import
+                    import sys
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    if current_dir not in sys.path:
+                        sys.path.insert(0, current_dir)
+                    # Centralized import path handling
+                    from import_utils import ensure_local_import
+                    ensure_local_import(__file__)
+                    from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
+                    
+                    # Model path retrieval
+                    model_path = resolve_local_gguf_path(model_filename)
+                    
+                    # mmproj processing (same logic as Vision LLM Node)
+                    if mmproj is None:
+                        raise RuntimeError("mmproj not specified. Please select an mmproj file in the optional inputs for Local models.")
 
-                if prompt_style == "Qwen-Image" and len(all_images) == 0:
-                    mmproj_selection = "(Not required)"
-                else:
-                    mmproj_selection = mmproj
+                    if prompt_style == "Qwen-Image" and len(all_images) == 0:
+                        mmproj_selection = "(Not required)"
+                    else:
+                        mmproj_selection = mmproj
 
-                mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj_selection)
-                
-                print(f'[Qwen Prompt Rewriter] Using Local model')
-                print(f'[Qwen Prompt Rewriter] Model: {model_filename}')
-                print(f'[Qwen Prompt Rewriter] mmproj: {mmproj_selection}')
-                print(f'[Qwen Prompt Rewriter] Using {len(all_images)} image(s)')
-                
-                # Convert device selection to n_gpu_layers
-                n_gpu_layers = -1 if device == "GPU" else 0
-                
-                output_prompt = rewrite_prompt_with_gguf(
-                    prompt=prompt,
-                    model_path=model_path,
-                    mmproj_path=mmproj_path,
-                    style="qwen_image" if prompt_style == "Qwen-Image" else "qwen_image_edit",
-                    target_language=target_language,
-                    images=all_images,
-                    max_tokens=2048,
-                    temperature=0.7,
-                    n_ctx=4096,
-                    n_gpu_layers=n_gpu_layers,
-                )
-
-                if target_language == "zh" and not is_acceptable_zh_output(output_prompt):
-                    print('[Qwen Prompt Rewriter] Output language mismatch (expected simplified Chinese), converting output to simplified Chinese in a second pass')
-                    protected_text, placeholders = protect_quoted_text(output_prompt, "QTXT")
+                    mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj_selection)
+                    
+                    print(f'[Qwen Prompt Rewriter] Using Local model')
+                    print(f'[Qwen Prompt Rewriter] Model: {model_filename}')
+                    print(f'[Qwen Prompt Rewriter] mmproj: {mmproj_selection}')
+                    print(f'[Qwen Prompt Rewriter] Using {len(all_images)} image(s)')
+                    
+                    # Convert device selection to n_gpu_layers
+                    n_gpu_layers = -1 if device == "GPU" else 0
+                    
                     output_prompt = rewrite_prompt_with_gguf(
-                        prompt=build_force_translate_to_zh_prompt(protected_text, prompt_style),
+                        prompt=prompt,
                         model_path=model_path,
-                        mmproj_path="(Not required)",
-                        style="zh_normalize",
-                        target_language="zh",
-                        images=None,
+                        mmproj_path=mmproj_path,
+                        style="qwen_image" if prompt_style == "Qwen-Image" else "qwen_image_edit",
+                        target_language=target_language,
+                        images=all_images,
                         max_tokens=2048,
-                        temperature=0.2,
+                        temperature=0.7,
                         n_ctx=4096,
                         n_gpu_layers=n_gpu_layers,
                     )
-                    output_prompt = restore_quoted_text(output_prompt, placeholders)
-                 
-            except Exception as e:
-                raise RuntimeError(f"Local model error: {str(e)}")
-        
-        # API processing (cloud models)
-        else:
-            # Load API key from api_key.txt
-            if not os.path.exists(key_path):
-                raise EnvironmentError(f"API key file not found: {key_path}\nPlease create this file with your Aliyun API key for cloud model usage.")
-            
-            with open(key_path, "r", encoding="utf-8") as f:
-                _api_key = f.read().strip()
+
+                    if target_language == "zh" and not is_acceptable_zh_output(output_prompt):
+                        print('[Qwen Prompt Rewriter] Output language mismatch (expected simplified Chinese), converting output to simplified Chinese in a second pass')
+                        protected_text, placeholders = protect_quoted_text(output_prompt, "QTXT")
+                        output_prompt = rewrite_prompt_with_gguf(
+                            prompt=build_force_translate_to_zh_prompt(protected_text, prompt_style),
+                            model_path=model_path,
+                            mmproj_path="(Not required)",
+                            style="zh_normalize",
+                            target_language="zh",
+                            images=None,
+                            max_tokens=2048,
+                            temperature=0.2,
+                            n_ctx=4096,
+                            n_gpu_layers=n_gpu_layers,
+                        )
+                        output_prompt = restore_quoted_text(output_prompt, placeholders)
                     
-            if not _api_key:
-                raise EnvironmentError(f'API_KEY is not set in "{key_path}"\nPlease add your Aliyun API key to this file for cloud model usage.')
+                except Exception as e:
+                    raise RuntimeError(f"Local model error: {str(e)}")
             
-            if prompt_style == "Qwen-Image":
-                output_prompt = polish_prompt(_api_key, prompt, model=llm_model, max_retries=max_retries, target_language=target_language)
+            # API processing (cloud models)
             else:
-                # Qwen-Image-Edit requires at least one image
-                if len(all_images) == 0:
-                    raise ValueError("Qwen-Image-Edit style requires at least one image input!")
+                # Load API key from api_key.txt
+                if not os.path.exists(key_path):
+                    raise EnvironmentError(f"API key file not found: {key_path}\nPlease create this file with your Aliyun API key for cloud model usage.")
                 
-                print(f'[Qwen Prompt Rewriter] Using {len(all_images)} image(s) for Image-Edit')
-                output_prompt = polish_prompt_edit(_api_key, prompt, all_images, model=llm_model, max_retries=max_retries, save_tokens=save_tokens, target_language=target_language)
-        
-        print(f'[Qwen Prompt Rewriter] Style: {prompt_style}')
-        print(f'[Qwen Prompt Rewriter] Target Language: {target_language}')
-        print(f'[Qwen Prompt Rewriter] Original: "{prompt}"')
-        print(f'[Qwen Prompt Rewriter] Enhanced: "{output_prompt}"')
-        
-        return (output_prompt,)
+                with open(key_path, "r", encoding="utf-8") as f:
+                    _api_key = f.read().strip()
+                        
+                if not _api_key:
+                    raise EnvironmentError(f'API_KEY is not set in "{key_path}"\nPlease add your Aliyun API key to this file for cloud model usage.')
+                
+                if prompt_style == "Qwen-Image":
+                    output_prompt = polish_prompt(_api_key, prompt, model=llm_model, max_retries=max_retries, target_language=target_language)
+                else:
+                    # Qwen-Image-Edit requires at least one image
+                    if len(all_images) == 0:
+                        raise ValueError("Qwen-Image-Edit style requires at least one image input!")
+                    
+                    print(f'[Qwen Prompt Rewriter] Using {len(all_images)} image(s) for Image-Edit')
+                    output_prompt = polish_prompt_edit(_api_key, prompt, all_images, model=llm_model, max_retries=max_retries, save_tokens=save_tokens, target_language=target_language)
+            
+            print(f'[Qwen Prompt Rewriter] Style: {prompt_style}')
+            print(f'[Qwen Prompt Rewriter] Target Language: {target_language}')
+            print(f'[Qwen Prompt Rewriter] Original: "{prompt}"')
+            print(f'[Qwen Prompt Rewriter] Enhanced: "{output_prompt}"')
+            
+            return (output_prompt,)
+        finally:
+            try:
+                from vision_llm_node import cleanup as vision_cleanup
+                vision_cleanup()
+            except Exception:
+                pass
 
 NODE_CLASS_MAPPINGS = {
     "QwenImageEditPromptGenerator": QwenImageEditPromptGenerator

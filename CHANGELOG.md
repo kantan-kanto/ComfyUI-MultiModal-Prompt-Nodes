@@ -3,6 +3,19 @@
 All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in this file.
 
 
+## [1.0.10] - 2026-04-02
+
+- Added support for Qwen3.5 local GGUF models
+  - Added Qwen3.5 model detection and proper handler selection (`Qwen35ChatHandler`)
+  - Fixed incorrect fallback to `Qwen3VLChatHandler` for Qwen3.5 model names
+  - Updated mmproj handling for Qwen3.5 (requirement checks and auto-detection flow)
+
+- Improved post-run cleanup behavior for local model nodes
+  - `VisionLLMNode`, `WanVideoPromptGenerator`, and `QwenImageEditPromptGenerator` now call `cleanup()` at the end of execution
+  - Introduced `cleanup(finalize=False/True)` to separate regular unload from final teardown on process exit
+  - Added safe manager re-initialization after cleanup for stable repeated runs
+
+
 ## [1.0.9] - 2026-03-15
 
 - Expanded the search scope for local Qwen-family GGUF models

@@ -19,12 +19,13 @@
 """
 Vision LLM Node (vision_llm_node.py)
 Local GGUF vision language model node for ComfyUI
-Supports Qwen2.5-VL and Qwen3-VL with multi-image input
+Supports Qwen2.5-VL Qwen3-VL and qwen3.5 with multi-image input
 Part of ComfyUI-MultiModal-Prompt-Nodes
 """
 
 import os
 import io
+import re
 import json
 import base64
 import numpy as np
@@ -50,7 +51,7 @@ except ImportError:
 
 # llama-cpp-python imports
 try:
-    # Qwen2.5-VL and Qwen3-VL vision support via Qwen2VLChatHandler / Qwen3VLChatHandler
+    # Qwen2.5-VL, Qwen3-VL and Qwen3.5L vision support via Qwen2VLChatHandler / Qwen3VLChatHandler / Qwen35ChatHandler
     from llama_cpp import Llama
 
     try:
@@ -64,12 +65,19 @@ try:
         QWEN3_AVAILABLE = True
     except ImportError:
         QWEN3_AVAILABLE = False
-    
+
+    try:
+        from llama_cpp.llama_chat_format import Qwen35ChatHandler
+        QWEN35_AVAILABLE = True
+    except ImportError:
+        QWEN35_AVAILABLE = False
+
     LLAMA_CPP_AVAILABLE = True
 except ImportError:
     LLAMA_CPP_AVAILABLE = False
     QWEN2_AVAILABLE = False
     QWEN3_AVAILABLE = False
+    QWEN35_AVAILABLE = False
     print("[Vision LLM Node] Warning: llama-cpp-python not available")
 
 # ============================================================================
@@ -510,8 +518,11 @@ class GGUFModelManager:
 
     def _infer_is_qwen3(self, model_path: str) -> bool:
         model_name_lower = os.path.basename(model_path).lower()
-        return "qwen3" in model_name_lower
+        return ("qwen3vl" in model_name_lower) or ("qwen3-vl" in model_name_lower)
 
+    def _infer_is_qwen35(self, model_path: str) -> bool:
+        model_name_lower = os.path.basename(model_path).lower()
+        return ("qwen35" in model_name_lower) or ("qwen3.5" in model_name_lower)
 
     def _auto_detect_mmproj(self, model_path: str) -> Optional[str]:
         """
@@ -531,7 +542,7 @@ class GGUFModelManager:
         name_l = name.lower()
 
         # Model family keywords (startswith)
-        families = ["qwen2", "qwen3"]
+        families = ["qwen2", "qwen3vl", "qwen3-vl", "qwen35", "qwen3.5"]
         family = next((k for k in families if name_l.startswith(k)), None)
 
         if family is None:
@@ -620,6 +631,7 @@ class GGUFModelManager:
         # Infer Qwen version from model name
         is_qwen2 = self._infer_is_qwen2(model_path)
         is_qwen3 = self._infer_is_qwen3(model_path)
+        is_qwen35 = self._infer_is_qwen35(model_path)
 
         # If user explicitly selected "(Not required)", force text-only even if the filename contains "qwen3".
         # This prevents accidental Qwen3-VL handler selection and mmproj auto-detection for text-only Qwen3 models.
@@ -645,6 +657,17 @@ class GGUFModelManager:
                     model_dir = os.path.dirname(model_path)
                     raise ValueError(
                         "Qwen3-VL requires mmproj file!\n"
+                        "Please download mmproj file from the model's GGUF repo.\n"
+                        f"Expected location: {model_dir}{os.sep}mmproj-*.gguf"
+                    )
+        # Qwen3.5 requires mmproj (unless explicitly disabled)
+        elif is_qwen35 and not force_no_mmproj:
+            if mmproj_path is None:
+                mmproj_path = self._auto_detect_mmproj(model_path)
+                if mmproj_path is None:
+                    model_dir = os.path.dirname(model_path)
+                    raise ValueError(
+                        "Qwen3.5 requires mmproj file!\n"
                         "Please download mmproj file from the model's GGUF repo.\n"
                         f"Expected location: {model_dir}{os.sep}mmproj-*.gguf"
                     )
@@ -687,6 +710,23 @@ class GGUFModelManager:
                     use_vision = False
             else:
                 print("[GGUFModelManager] Error: Qwen3-VL requires an existing mmproj file")
+                chat_handler = None
+                use_vision = False
+        elif is_qwen35 and QWEN35_AVAILABLE:
+            if mmproj_path is not None and os.path.exists(mmproj_path):
+                try:
+                    print(f"[GGUFModelManager] Qwen3.5 with mmproj: {mmproj_path}")
+                    chat_handler = Qwen35ChatHandler(
+                        clip_model_path=mmproj_path,
+                        enable_thinking=False,
+                    )
+                    use_vision = True
+                except Exception as e:
+                    print(f"[GGUFModelManager] Warning: Failed to initialize Qwen3.5 chat handler: {e}")
+                    chat_handler = None
+                    use_vision = False
+            else:
+                print("[GGUFModelManager] Error: Qwen3.5 requires an existing mmproj file")
                 chat_handler = None
                 use_vision = False
         else:
@@ -806,6 +846,10 @@ def rewrite_prompt_with_gguf(
     Returns:
         Rewritten prompt
     """
+    global _model_manager
+    if _model_manager is None:
+        _model_manager = GGUFModelManager()
+
     # Load model
     model = _model_manager.load_model(
         model_path=model_path,
@@ -951,7 +995,7 @@ class VisionLLMNode:
     RETURN_NAMES = ("STRING",)
     FUNCTION = "rewrite"
     CATEGORY = "multimodal/prompt"
-    DESCRIPTION = "Local GGUF vision-language models (Qwen3-VL, Qwen2.5-VL) for prompt generation"
+    DESCRIPTION = "Local GGUF vision-language models for prompt generation"
     
     def rewrite(self, prompt: str, model: str, mmproj: str, style: str, target_language: str,
                 max_tokens: int, temperature: float, device: str, image=None) -> tuple:
@@ -963,72 +1007,74 @@ class VisionLLMNode:
         """
 
 
-        # llama-cpp-python check
-        if not LLAMA_CPP_AVAILABLE:
-            print("[Vision LLM Node] Error: llama-cpp-python not available")
-            return (prompt,)
-        
-
-        if "(No Qwen GGUF models found" in model:
-            print("[Vision LLM Node] Error: No Qwen GGUF models found in models/LLM or models/text_encoders")
-            return (prompt,)
-        
         try:
-            # construction
-            model_path = resolve_local_gguf_path(model)
-            
-            if not os.path.exists(model_path):
-                print(f"[Vision LLM Node] Error: Model not found: {model_path}")
+            # llama-cpp-python check
+            if not LLAMA_CPP_AVAILABLE:
+                print("[Vision LLM Node] Error: llama-cpp-python not available")
                 return (prompt,)
-            
-            # mmproj processing
-            mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj)
-            
-            # PIL
-            pil_images = None
-            if image is not None:
-                pil_images = tensor2pil(image)
-                print(f"[Vision LLM Node] Using {len(pil_images)} image(s)")
-            
-            # Convert device selection to n_gpu_layers
-            # GPU: -1 (all layers), CPU: 0 (no GPU)
-            n_gpu_layers = -1 if device == "GPU" else 0
-            
-            # Load model
-            print(f"[Vision LLM Node] Loading model: {model}")
+
+            if "(No Qwen GGUF models found" in model:
+                print("[Vision LLM Node] Error: No Qwen GGUF models found in models/LLM or models/text_encoders")
+                return (prompt,)
+
             try:
-                enhanced_prompt = rewrite_prompt_with_gguf(
-                    prompt=prompt,
-                    model_path=model_path,
-                    mmproj_path=mmproj_path,
-                    style=style,
-                    target_language=target_language,
-                    images=pil_images,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    n_gpu_layers=n_gpu_layers,
-                )
-                return (enhanced_prompt,)
-            except ValueError as e:
-                # Translated
-                error_str = str(e)
-                if "Failed to load model" in error_str:
-                    error_msg = (
-                        f"ERROR: Failed to load model '{model}'"
+                # construction
+                model_path = resolve_local_gguf_path(model)
+
+                if not os.path.exists(model_path):
+                    print(f"[Vision LLM Node] Error: Model not found: {model_path}")
+                    return (prompt,)
+
+                # mmproj processing
+                mmproj_path = resolve_mmproj_path_for_model(model_path, mmproj)
+
+                # PIL
+                pil_images = None
+                if image is not None:
+                    pil_images = tensor2pil(image)
+                    print(f"[Vision LLM Node] Using {len(pil_images)} image(s)")
+
+                # Convert device selection to n_gpu_layers
+                # GPU: -1 (all layers), CPU: 0 (no GPU)
+                n_gpu_layers = -1 if device == "GPU" else 0
+
+                # Load model
+                print(f"[Vision LLM Node] Loading model: {model}")
+                try:
+                    enhanced_prompt = rewrite_prompt_with_gguf(
+                        prompt=prompt,
+                        model_path=model_path,
+                        mmproj_path=mmproj_path,
+                        style=style,
+                        target_language=target_language,
+                        images=pil_images,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        n_gpu_layers=n_gpu_layers,
                     )
-                    print(f"[Vision LLM Node] {error_msg}")
-                    raise RuntimeError(error_msg)
-                else:
-                    raise
-        
-        except RuntimeError:
-            # Translated
-            raise
-        except Exception as e:
-            print(f"[Vision LLM Node] Unexpected error: {e}")
-            import traceback
-            traceback.print_exc()
-            raise RuntimeError(f"Unexpected error during prompt rewrite: {str(e)}")
+                    return (enhanced_prompt,)
+                except ValueError as e:
+                    # Translated
+                    error_str = str(e)
+                    if "Failed to load model" in error_str:
+                        error_msg = (
+                            f"ERROR: Failed to load model '{model}'"
+                        )
+                        print(f"[Vision LLM Node] {error_msg}")
+                        raise RuntimeError(error_msg)
+                    else:
+                        raise
+
+            except RuntimeError:
+                # Translated
+                raise
+            except Exception as e:
+                print(f"[Vision LLM Node] Unexpected error: {e}")
+                import traceback
+                traceback.print_exc()
+                raise RuntimeError(f"Unexpected error during prompt rewrite: {str(e)}")
+        finally:
+            cleanup()
 
 # ============================================================================
 # ComfyUI Node Registration
@@ -1046,11 +1092,31 @@ NODE_DISPLAY_NAME_MAPPINGS = {
 # Cleanup on module unload
 # ============================================================================
 
-def cleanup():
+def cleanup(finalize: bool = False):
     """Cleanup on module unload"""
     global _model_manager
-    if _model_manager is not None:
-        _model_manager.unload_model()
+    manager = _model_manager
+
+    if manager is not None:
+        try:
+            manager.unload_model()
+        except Exception as e:
+            print(f"[Vision LLM Node] Warning during cleanup unload: {e}")
+
+    import gc as _gc
+    _gc.collect()
+    try:
+        import torch as _torch
+        if _torch.cuda.is_available():
+            _torch.cuda.empty_cache()
+        if hasattr(_torch, "xpu") and _torch.xpu.is_available():
+            _torch.xpu.empty_cache()
+    except Exception:
+        pass
+    _gc.collect()
+
+    if finalize:
+        _model_manager = None
 
 import atexit
-atexit.register(cleanup)
+atexit.register(lambda: cleanup(finalize=True))
