@@ -3,6 +3,27 @@
 All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in this file.
 
 
+## [1.0.11] - 2026-05-09
+
+- Added support for Qwen3.6 local GGUF models
+  - Added Qwen3.6 filename detection (`qwen36` / `qwen3.6`)
+  - Routed Qwen3.6 through the existing `Qwen35ChatHandler` path
+  - Updated Qwen3.5/3.6 mmproj requirement messages and logging
+  - Set `image_min_tokens=1024` for Qwen3.5/3.6 chat handler initialization
+
+- Improved local GGUF model discovery
+  - Added discovery of GGUF models in paths registered by ComfyUI through `extra_model_paths.yaml`
+  - Uses `folder_paths.get_folder_paths("text_encoders")` and `folder_paths.get_folder_paths("llm")` when available
+  - Preserves absolute paths for models stored outside the default ComfyUI `models` directory
+
+- Improved mmproj auto-detection
+  - If no family-prefixed mmproj matches but the model directory contains exactly one `mmproj-*.gguf`, that file is used automatically
+  - Ambiguous directories with multiple unmatched mmproj files still require manual selection
+
+- Documentation
+  - Updated README notes for extra model paths and mmproj fallback behavior
+
+
 ## [1.0.10] - 2026-04-02
 
 - Added support for Qwen3.5 local GGUF models

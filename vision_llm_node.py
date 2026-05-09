@@ -19,7 +19,7 @@
 """
 Vision LLM Node (vision_llm_node.py)
 Local GGUF vision language model node for ComfyUI
-Supports Qwen2.5-VL Qwen3-VL and qwen3.5 with multi-image input
+Supports Qwen2.5-VL, Qwen3-VL, qwen3.5 and qwen3.6 with multi-image input
 Part of ComfyUI-MultiModal-Prompt-Nodes
 """
 
@@ -51,7 +51,7 @@ except ImportError:
 
 # llama-cpp-python imports
 try:
-    # Qwen2.5-VL, Qwen3-VL and Qwen3.5L vision support via Qwen2VLChatHandler / Qwen3VLChatHandler / Qwen35ChatHandler
+    # Qwen2.5-VL, Qwen3-VL, Qwen3.5 and Qwen3.6 vision support via Qwen2VLChatHandler / Qwen3VLChatHandler / Qwen35ChatHandler
     from llama_cpp import Llama
 
     try:
@@ -522,7 +522,7 @@ class GGUFModelManager:
 
     def _infer_is_qwen35(self, model_path: str) -> bool:
         model_name_lower = os.path.basename(model_path).lower()
-        return ("qwen35" in model_name_lower) or ("qwen3.5" in model_name_lower)
+        return ("qwen35" in model_name_lower) or ("qwen3.5" in model_name_lower) or ("qwen36" in model_name_lower) or ("qwen3.6" in model_name_lower)
 
     def _auto_detect_mmproj(self, model_path: str) -> Optional[str]:
         """
@@ -542,7 +542,7 @@ class GGUFModelManager:
         name_l = name.lower()
 
         # Model family keywords (startswith)
-        families = ["qwen2", "qwen3vl", "qwen3-vl", "qwen35", "qwen3.5"]
+        families = ["qwen2", "qwen3vl", "qwen3-vl", "qwen35", "qwen3.5", "qwen36", "qwen3.6"]
         family = next((k for k in families if name_l.startswith(k)), None)
 
         if family is None:
@@ -669,14 +669,14 @@ class GGUFModelManager:
                         "Please download mmproj file from the model's GGUF repo.\n"
                         f"Expected location: {model_dir}{os.sep}mmproj-*.gguf"
                     )
-        # Qwen3.5 requires mmproj (unless explicitly disabled)
+        # Qwen3.5/3.6 requires mmproj (unless explicitly disabled)
         elif is_qwen35 and not force_no_mmproj:
             if mmproj_path is None:
                 mmproj_path = self._auto_detect_mmproj(model_path)
                 if mmproj_path is None:
                     model_dir = os.path.dirname(model_path)
                     raise ValueError(
-                        "Qwen3.5 requires mmproj file!\n"
+                        "Qwen3.5/3.6 requires mmproj file!\n"
                         "Please download mmproj file from the model's GGUF repo.\n"
                         f"Expected location: {model_dir}{os.sep}mmproj-*.gguf"
                     )
@@ -724,18 +724,19 @@ class GGUFModelManager:
         elif is_qwen35 and QWEN35_AVAILABLE:
             if mmproj_path is not None and os.path.exists(mmproj_path):
                 try:
-                    print(f"[GGUFModelManager] Qwen3.5 with mmproj: {mmproj_path}")
+                    print(f"[GGUFModelManager] Qwen3.5/3.6 with mmproj: {mmproj_path}")
                     chat_handler = Qwen35ChatHandler(
                         clip_model_path=mmproj_path,
                         enable_thinking=False,
+                        image_min_tokens=1024,
                     )
                     use_vision = True
                 except Exception as e:
-                    print(f"[GGUFModelManager] Warning: Failed to initialize Qwen3.5 chat handler: {e}")
+                    print(f"[GGUFModelManager] Warning: Failed to initialize Qwen3.5/3.6 chat handler: {e}")
                     chat_handler = None
                     use_vision = False
             else:
-                print("[GGUFModelManager] Error: Qwen3.5 requires an existing mmproj file")
+                print("[GGUFModelManager] Error: Qwen3.5/3.6 requires an existing mmproj file")
                 chat_handler = None
                 use_vision = False
         else:

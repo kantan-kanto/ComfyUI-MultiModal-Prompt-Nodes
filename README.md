@@ -1,15 +1,15 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.10
+**Version:** 1.0.11
 **License:** GPL-3.0
 
 Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **Qwen-Image-Edit** and **Wan2.2**.  
-Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL and Qwen3.5) and **Qwen API** for image and video prompt generation and enhancement.
+Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL, Qwen3.5 and Qwen3.6) and **Qwen API** for image and video prompt generation and enhancement.
 
 ---
 ## Upgrade Notes for Existing Users
 
-The following notes are intended for existing users upgrading to `1.0.10`.
+The following notes are intended for existing users upgrading to `1.0.11`.
 
 ### Expanded search paths for local Qwen-family GGUF models
 In addition to `models/LLM`, this release now searches `models/text_encoders` and its subdirectories for GGUF files. Because this changes how model paths are handled internally, you may need to reselect your models the first time you run the node after updating.
@@ -48,7 +48,7 @@ Based on extensive testing, **Wan2.2** and **Qwen-Image-Edit** respond **signifi
   - `concise`: Minimal keywords, focused on core elements
   - `creative`: Artistic interpretation with unique perspectives
 - **Multi-image input**: Support batch image input via ComfyUI's batch nodes (e.g., Images Batch Multiple)
-- **Local GGUF support**: Run Qwen2.5-VL, Qwen3-VL, and Qwen3.5 models locally
+- **Local GGUF support**: Run Qwen2.5-VL, Qwen3-VL, Qwen3.5 and Qwen3.6 models locally
 - **Auto-detect mmproj**: Automatic detection or manual selection
 
 ### 2. Qwen Image Edit Prompt Generator
@@ -96,15 +96,15 @@ pip install dashscope pillow numpy
 
 **Important:** Model compatibility varies by llama-cpp-python version. Based on my testing environment:
 
-| Version | Qwen2.5-VL | Qwen3-VL | Qwen3.5 | 
+| Version | Qwen2.5-VL | Qwen3-VL | Qwen3.5/3.6 | 
 |---------|------------|----------|---------|
 | 0.3.16 (official) | ✅ | ❌ | ❌ |
 | 0.3.21+ (JamePeng fork) | ✅ | ✅ | ❌ |
-| 0.3.33+ (JamePeng fork) | ✅ | ✅ | ✅ | 
+| 0.3.36+ (JamePeng fork) | ✅ | ✅ | ✅ | 
 
 ***Note:** Vision input support may vary depending on your environment and configuration.
 
-**Recommended Installation (JamePeng fork for Qwen3-VL and Qwen3.5 support):**  
+**Recommended Installation (JamePeng fork for Qwen3-VL and Qwen3.5/3.6 support):**  
 Please follow the build and installation instructions provided in the JamePeng fork repository, as this fork requires a custom build and cannot be reliably installed via a simple `pip install`.
 
 **Source:** https://github.com/JamePeng/llama-cpp-python
@@ -254,8 +254,8 @@ Add your Alibaba Cloud Dashscope API key to this file.
 - ✅ Qwen3-VL(4B/8B): Full vision support with JamePeng fork
 - ✅ Requires matching mmproj file
 
-### Qwen3.5 (Separate mmproj)
-- ✅ Qwen3.5(9B/27B/35B-A3B): Full vision support with JamePeng fork
+### Qwen3.5/3.6 (Separate mmproj)
+- ✅ Qwen3.5/3.6(9B/27B/35B-A3B): Full vision support with JamePeng fork
 - ✅ Requires matching mmproj file
 
 ### Model Sources
@@ -295,12 +295,12 @@ A:
 2. Restart ComfyUI
 3. Verify file extensions are `.gguf`
 
-**Q: Models stored via `extra_model_paths.yaml` (e.g. on a different drive) are not listed in the dropdown**  
+**Q: Models stored via `extra_model_paths.yaml` (e.g. on a different drive) are not listed in the dropdown**
 A: Versions ≤ 1.0.10 only searched `folder_paths.models_dir/LLM` and `folder_paths.models_dir/text_encoders` directly and ignored paths registered by `extra_model_paths.yaml`. This meant models on a separate drive — such as `W:\ai-models\text_encoders\` — were never discovered even though ComfyUI itself could load them.
 
 Fixed in the patch that follows: `local_gguf_utils.py` now calls `folder_paths.get_folder_paths("text_encoders")` and `folder_paths.get_folder_paths("llm")` first, which returns every path registered by ComfyUI (including entries from `extra_model_paths.yaml`). Models on other drives or in non-default locations are resolved as absolute paths so the rest of the load pipeline still works correctly.
 
-**Q: mmproj auto-detect fails with "no mmproj matched the model family prefix" even though a `mmproj-*.gguf` file exists next to the model**  
+**Q: mmproj auto-detect fails with "no mmproj matched the model family prefix" even though a `mmproj-*.gguf` file exists next to the model**
 A: Auto-detect previously required the mmproj filename to begin with the model's family prefix (e.g. `mmproj-qwen3.5-BF16.gguf`). Files with generic names like `mmproj-BF16.gguf` were rejected.
 
 Fixed in the patch that follows: if no family-prefixed mmproj is found but there is **exactly one** `mmproj-*.gguf` in the model's directory, that file is used automatically with a fallback warning in the log. If multiple unmatched mmproj files are present you still need to select one manually.
@@ -462,6 +462,7 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.10
-- Added support for Qwen3.5 local GGUF models
-- Improved post-run cleanup behavior for local model nodes
+### Current Version: 1.0.11
+- Added support for Qwen3.6 local GGUF model detection through the Qwen3.5 handler path
+- Added discovery of GGUF models registered via `extra_model_paths.yaml`
+- Improved mmproj auto-detection when a model directory contains exactly one `mmproj-*.gguf` file
