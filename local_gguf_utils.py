@@ -7,16 +7,50 @@ import folder_paths
 LOCAL_LLM_SEARCH_DIRS: Tuple[str, ...] = ("LLM", "text_encoders")
 
 
+def _get_search_dirs() -> List[str]:
+    """Get all directories to search for GGUF files, including extra_model_paths.yaml entries."""
+    dirs_seen: set = set()
+    result: List[str] = []
+
+    for subdir in LOCAL_LLM_SEARCH_DIRS:
+        # Try both original case and lowercase — yaml keys are often lowercase
+        for key in (subdir, subdir.lower()):
+            try:
+                for d in folder_paths.get_folder_paths(key):
+                    norm = os.path.normpath(d)
+                    if norm not in dirs_seen:
+                        dirs_seen.add(norm)
+                        result.append(norm)
+            except KeyError:
+                pass
+
+        # Also include the default models_dir subfolder in case it isn't registered
+        default_dir = os.path.normpath(os.path.join(folder_paths.models_dir, subdir))
+        if default_dir not in dirs_seen:
+            dirs_seen.add(default_dir)
+            result.append(default_dir)
+
+    return result
+
+
 def to_models_relative_path(path: str) -> str:
-    return os.path.relpath(path, folder_paths.models_dir).replace("\\", "/")
+    try:
+        rel = os.path.relpath(path, folder_paths.models_dir)
+        # If the path is outside models_dir the relative form starts with ".."
+        # (on Windows, relpath raises ValueError across different drives).
+        # In both cases fall back to the absolute path so the round-trip via
+        # resolve_local_gguf_path() still works.
+        if not rel.startswith(".."):
+            return rel.replace("\\", "/")
+    except ValueError:
+        pass
+    return os.path.normpath(path)
 
 
 def iter_local_gguf_files() -> Iterator[str]:
-    for subdir in LOCAL_LLM_SEARCH_DIRS:
-        root_dir = os.path.join(folder_paths.models_dir, subdir)
+    for root_dir in _get_search_dirs():
         if not os.path.isdir(root_dir):
             continue
-
         for current_dir, _, files in os.walk(root_dir):
             for file_name in files:
                 if file_name.endswith(".gguf"):
@@ -49,6 +83,10 @@ def discover_local_mmproj_files() -> List[str]:
 
 
 def resolve_local_gguf_path(relative_path: str) -> str:
+    # Absolute paths arise for models that live outside models_dir (e.g. on a
+    # different drive).  Return them unchanged so os.path.exists() still works.
+    if os.path.isabs(relative_path):
+        return os.path.normpath(relative_path)
     return os.path.normpath(os.path.join(folder_paths.models_dir, relative_path))
 
 
