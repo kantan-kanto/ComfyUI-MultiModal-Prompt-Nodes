@@ -580,6 +580,15 @@ class GGUFModelManager:
             return self._normalize_path(cand)
 
         if len(matches) == 0:
+            # Fallback: if there is exactly one mmproj-*.gguf in the directory,
+            # use it regardless of its name (e.g. mmproj-BF16.gguf).
+            if len(mmproj_files) == 1:
+                fname = mmproj_files[0]
+                cand = os.path.join(model_dir, fname)
+                print(
+                    f"[GGUFModelManager] Auto-detected mmproj (fallback, only file in dir): {fname}"
+                )
+                return self._normalize_path(cand)
             raise ValueError(
                 "mmproj auto-detect failed: no mmproj matched the model family prefix.\n"
                 f"model: {base}\n"
