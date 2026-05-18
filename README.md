@@ -11,6 +11,13 @@ Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL, Qwen3.5 and Qw
 
 The following notes are intended for existing users upgrading to `1.0.11`.
 
+### Qwen API model list updated for Model Studio deprecation notices
+Cloud API model selection now prioritizes Qwen3.6 models, including `qwen3.6-plus` and `qwen3.6-flash`.
+Older API models remain selectable for existing workflow compatibility, but are marked as deprecated in the UI:
+- `deprecated: announced offline since 2026-05-13` for models already announced as offline.
+- `deprecated: offline scheduled 2026-07-13` for models announced for the July 13, 2026 offline window.
+- `deprecated: legacy, prefer Qwen3.6` for legacy models kept for compatibility.
+
 ### Expanded search paths for local Qwen-family GGUF models
 In addition to `models/LLM`, this release now searches `models/text_encoders` and its subdirectories for GGUF files. Because this changes how model paths are handled internally, you may need to reselect your models the first time you run the node after updating.
 
@@ -177,7 +184,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 - `target_language`: Output language (auto/zh/en)
 - `llm_model`: Model selection
   - `Local: xxx`: Local GGUF models (auto-detected)
-  - API models: qwen-vl-max, qwen-plus, etc.
+  - API models: qwen3.6-plus, qwen3.6-flash, etc.
 - `mmproj`: mmproj file (required for local models)
   - `(Auto-detect)`: Automatic detection
   - `(Not required)`: For API models or text-only mode 
@@ -208,7 +215,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 - `target_language`: Output language (auto/zh/en)
 - `llm_model`: Model selection
   - `Local: xxx`: Local GGUF models
-  - API models: qwen-vl-max (for I2V), qwen-plus, etc.
+  - API models: qwen3.6-plus, qwen3.6-flash, etc.
 - `mmproj`: mmproj selection (same as other nodes)
 - `max_retries`: API retry attempts
 - `device`: CPU/GPU for local models
@@ -224,7 +231,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 **Important notes:**
 - **Use Chinese prompts** (`target_language: zh`) for best results
 - Supports up to 600+ Chinese characters (2048 tokens)
-- For I2V tasks, use `qwen-vl-*` models
+- For I2V tasks, use Qwen3.6 or `qwen-vl-*` models
 
 **Example T2V workflow:**
 1. Enter prompt: "A cat looking out from a windowsill"
@@ -238,7 +245,7 @@ Add your Alibaba Cloud Dashscope API key to this file.
 2. Enter motion description: "The camera slowly pushes in"
 3. Set `task_type`: Image-to-Video
 4. Set `target_language`: zh
-5. Ensure model supports vision (qwen-vl-*)
+5. Ensure model supports vision (Qwen3.6 or qwen-vl-*)
 6. Run to get I2V prompt
 
 ---

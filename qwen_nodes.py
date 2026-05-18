@@ -50,6 +50,51 @@ dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
 
 key_path = os.path.join(folder_paths.get_folder_paths("custom_nodes")[0], "ComfyUI-MultiModal-Prompt-Nodes", "api_key.txt")
 
+QWEN_API_MAIN_MODELS = [
+    "qwen3.6-plus",
+    "qwen3.6-flash",
+    "qwen3.6-plus-2026-04-02",
+    "qwen3.6-flash-2026-04-16",
+    "qwen3.6-35b-a3b",
+]
+
+QWEN_API_OFFLINE_SINCE_2026_05_13 = [
+    "qwen-vl-max-latest",
+    "qwen-vl-max-2025-08-13",
+    "qwen-vl-max-2025-04-08",
+    "qwen-max-latest",
+]
+
+QWEN_API_OFFLINE_SCHEDULED_2026_07_13 = [
+    "qwen-vl-max",
+    "qwen-vl-plus",
+    "qwen-plus",
+    "qwen-max",
+    "qwen-turbo",
+]
+
+QWEN_API_LEGACY_MODELS = [
+    "qwen-plus-latest",
+]
+
+QWEN_API_MODELS = (
+    QWEN_API_MAIN_MODELS
+    + [f"{model} (deprecated: announced offline since 2026-05-13)" for model in QWEN_API_OFFLINE_SINCE_2026_05_13]
+    + [f"{model} (deprecated: offline scheduled 2026-07-13)" for model in QWEN_API_OFFLINE_SCHEDULED_2026_07_13]
+    + [f"{model} (deprecated: legacy, prefer Qwen3.6)" for model in QWEN_API_LEGACY_MODELS]
+)
+
+QWEN_API_MODEL_IDS = set(
+    QWEN_API_MAIN_MODELS
+    + QWEN_API_OFFLINE_SINCE_2026_05_13
+    + QWEN_API_OFFLINE_SCHEDULED_2026_07_13
+    + QWEN_API_LEGACY_MODELS
+)
+QWEN_API_VISION_MODEL_IDS = {model for model in QWEN_API_MODEL_IDS if model.startswith(("qwen3.6-", "qwen-vl-"))}
+
+def normalize_api_model_name(model):
+    return model.split(" (", 1)[0]
+
 IMAGE_SYSTEM_PROMPT_ZH = '''
 你是一位Prompt优化师，旨在将用户输入改写为优质Prompt，使其更完整、更具表现力，同时不改变原意。
 任务要求：
@@ -299,12 +344,13 @@ def build_force_translate_to_zh_prompt(text, prompt_style):
         f"{text}"
     )
 
-def api_edit(prompt, img_list, model="qwen-vl-max-latest", save_tokens=True, api_key=None, kwargs={}):
+def api_edit(prompt, img_list, model="qwen3.6-plus", save_tokens=True, api_key=None, kwargs={}):
     if not api_key:
         raise EnvironmentError("API_KEY is not set!")
-        
+
+    model = normalize_api_model_name(model)
     print(f'Using "{model}" for prompt rewriting...')
-    assert model in ["qwen-vl-max", "qwen-vl-max-latest", "qwen-vl-max-2025-08-13", "qwen-vl-max-2025-04-08"], f'"{model}" is not available for the "Qwen-Image-Edit" style.'
+    assert model in QWEN_API_VISION_MODEL_IDS, f'"{model}" is not available for the "Qwen-Image-Edit" style.'
     sys_promot = "you are a helpful assistant, you should provide useful answers to users."
     messages = [
         {"role": "system", "content": sys_promot},
@@ -338,7 +384,7 @@ def api_edit(prompt, img_list, model="qwen-vl-max-latest", save_tokens=True, api
     else:
         raise Exception(f'Failed to post: {response}')
 
-def polish_prompt_edit(api_key, prompt, img, model="qwen-vl-max-latest", max_retries=10, save_tokens=True, target_language="auto"):
+def polish_prompt_edit(api_key, prompt, img, model="qwen3.6-plus", max_retries=10, save_tokens=True, target_language="auto"):
     retries = 0
     
     # Detect original language
@@ -395,8 +441,9 @@ def api(prompt, model, api_key=None, kwargs={}):
     if not api_key:
         raise EnvironmentError("API_KEY is not set!")
     
+    model = normalize_api_model_name(model)
     print(f'Using "{model}" for prompt rewriting...')
-    assert model in ["qwen-vl-max", "qwen-vl-max-latest", "qwen-vl-max-2025-08-13", "qwen-plus", "qwen-max", "qwen-plus-latest", "qwen-max-latest"], f'"{model}" is not available for the "Qwen-Image" style.'
+    assert model in QWEN_API_MODEL_IDS, f'"{model}" is not available for the "Qwen-Image" style.'
     messages = [
         {'role': 'system', 'content': 'You are a helpful assistant.'},
         {'role': 'user', 'content': prompt}
@@ -417,7 +464,7 @@ def api(prompt, model, api_key=None, kwargs={}):
     else:
         raise Exception(f'Failed to post: {response}')
 
-def polish_prompt(api_key, prompt, model="qwen-plus", max_retries=10, target_language="auto"):
+def polish_prompt(api_key, prompt, model="qwen3.6-plus", max_retries=10, target_language="auto"):
     retries = 0
     
     # Detect original language
@@ -480,13 +527,8 @@ class QwenImageEditPromptGenerator:
         if not mmproj_files:
             mmproj_options = ["(Auto-detect)", "(Not required)"]
         
-        # API
-        api_models = ["qwen-vl-max", "qwen-vl-max-latest", "qwen-vl-max-2025-08-13", 
-                      "qwen-vl-max-2025-04-08", "qwen-plus", "qwen-max", 
-                      "qwen-plus-latest", "qwen-max-latest"]
-        
         # integration
-        all_models = local_models + api_models
+        all_models = local_models + QWEN_API_MODELS
         if not all_models:
             all_models = ["(No models found)"]
         
