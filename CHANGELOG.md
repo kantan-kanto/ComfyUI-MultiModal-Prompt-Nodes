@@ -3,6 +3,22 @@
 All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in this file.
 
 
+## [1.0.12] - 2026-05-19
+
+- Updated Qwen cloud API model selection
+  - Prioritized Qwen3.6 API models, including `qwen3.6-plus` and `qwen3.6-flash`
+  - Kept legacy Qwen API models selectable for existing workflow compatibility
+  - Added UI deprecation notices that distinguish models announced offline since 2026-05-13 from models scheduled offline on 2026-07-13
+
+- Improved API model handling
+  - Normalized annotated UI model labels before sending requests to DashScope
+  - Updated Qwen Image Edit API defaults to use `qwen3.6-plus`
+  - Updated Wan I2V API validation to allow Qwen3.6 vision-capable models in addition to `qwen-vl-*` models
+
+- Documentation
+  - Documented the Qwen API model deprecation notice handling in README upgrade notes
+
+
 ## [1.0.11] - 2026-05-09
 
 - Added support for Qwen3.6 local GGUF models

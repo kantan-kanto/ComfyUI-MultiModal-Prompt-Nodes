@@ -1,6 +1,6 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.11
+**Version:** 1.0.12
 **License:** GPL-3.0
 
 Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **Qwen-Image-Edit** and **Wan2.2**.  
@@ -9,7 +9,7 @@ Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL, Qwen3.5 and Qw
 ---
 ## Upgrade Notes for Existing Users
 
-The following notes are intended for existing users upgrading to `1.0.11`.
+The following notes are intended for existing users upgrading to `1.0.12`.
 
 ### Qwen API model list updated for Model Studio deprecation notices
 Cloud API model selection now prioritizes Qwen3.6 models, including `qwen3.6-plus` and `qwen3.6-flash`.
@@ -469,7 +469,7 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.11
-- Added support for Qwen3.6 local GGUF model detection through the Qwen3.5 handler path
-- Added discovery of GGUF models registered via `extra_model_paths.yaml`
-- Improved mmproj auto-detection when a model directory contains exactly one `mmproj-*.gguf` file
+### Current Version: 1.0.12
+- Prioritized Qwen3.6 cloud API models in Qwen and Wan prompt generator nodes
+- Kept legacy Qwen API models selectable with deprecation notices for workflow compatibility
+- Updated Wan I2V API validation to allow Qwen3.6 vision-capable models
