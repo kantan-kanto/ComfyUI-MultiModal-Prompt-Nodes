@@ -28,6 +28,7 @@ import io
 import re
 import json
 import base64
+import threading
 import numpy as np
 from PIL import Image
 from typing import Optional, List, Dict, Any
@@ -823,6 +824,88 @@ class GGUFModelManager:
 _model_manager = GGUFModelManager()
 
 # ============================================================================
+# ComfyUI Interrupt / llama.cpp Abort Helpers
+# ============================================================================
+
+def _processing_interrupted() -> bool:
+    try:
+        import comfy.model_management  # type: ignore
+        return bool(comfy.model_management.processing_interrupted())
+    except Exception:
+        return False
+
+
+def _throw_if_processing_interrupted() -> None:
+    try:
+        import comfy.model_management  # type: ignore
+    except ImportError:
+        return
+    comfy.model_management.throw_exception_if_processing_interrupted()
+
+
+def _is_interrupt_error(err: Exception) -> bool:
+    try:
+        import comfy.model_management  # type: ignore
+        return isinstance(err, comfy.model_management.InterruptProcessingException)
+    except Exception:
+        return False
+
+
+def _finish_reason(response: Any) -> str:
+    if not isinstance(response, dict):
+        return ""
+    choices = response.get("choices")
+    if not choices:
+        return ""
+    choice = choices[0] or {}
+    if not isinstance(choice, dict):
+        return ""
+    return str(choice.get("finish_reason") or "")
+
+
+class _AbortWatch:
+    def __init__(self, llm: Any, poll_interval: float = 0.1) -> None:
+        self.abort_requested = False
+        self._llm = llm
+        self._poll_interval = max(0.01, float(poll_interval))
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def __enter__(self) -> "_AbortWatch":
+        if not callable(getattr(self._llm, "abort", None)):
+            return self
+        self._thread = threading.Thread(
+            target=self._watch,
+            name="vision-llm-abort-watch",
+            daemon=True,
+        )
+        self._thread.start()
+        return self
+
+    def __exit__(self, _exc_type, _exc, _tb) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+
+    def _watch(self) -> None:
+        while not self._stop_event.wait(self._poll_interval):
+            if not _processing_interrupted():
+                continue
+            self.abort_requested = True
+            try:
+                self._llm.abort()
+            except Exception as e:
+                print(f"[Vision LLM Node] Warning: failed to abort llama generation: {e}")
+            return
+
+
+def _raise_if_abort_detected(abort_requested: bool, response: Any) -> None:
+    if not abort_requested and _finish_reason(response) != "abort":
+        return
+    _throw_if_processing_interrupted()
+    raise RuntimeError("Generation aborted")
+
+# ============================================================================
 # Prompt Rewriter Function
 # ============================================================================
 
@@ -913,12 +996,15 @@ def rewrite_prompt_with_gguf(
     
 
     print(f"[Vision LLM Node] Generating with style='{style}', lang='{lang}'...")
-    
-    response = model.create_chat_completion(
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
+
+    _throw_if_processing_interrupted()
+    with _AbortWatch(model) as abort_watch:
+        response = model.create_chat_completion(
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        _raise_if_abort_detected(abort_watch.abort_requested, response)
     
 
     result = response['choices'][0]['message']['content']
@@ -1079,6 +1165,8 @@ class VisionLLMNode:
                 # Translated
                 raise
             except Exception as e:
+                if _is_interrupt_error(e):
+                    raise
                 print(f"[Vision LLM Node] Unexpected error: {e}")
                 import traceback
                 traceback.print_exc()

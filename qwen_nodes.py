@@ -603,7 +603,7 @@ class QwenImageEditPromptGenerator:
                     # Centralized import path handling
                     from import_utils import ensure_local_import
                     ensure_local_import(__file__)
-                    from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
+                    from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model, _is_interrupt_error
                     
                     # Model path retrieval
                     model_path = resolve_local_gguf_path(model_filename)
@@ -658,6 +658,8 @@ class QwenImageEditPromptGenerator:
                         output_prompt = restore_quoted_text(output_prompt, placeholders)
                     
                 except Exception as e:
+                    if _is_interrupt_error(e):
+                        raise
                     raise RuntimeError(f"Local model error: {str(e)}")
             
             # API processing (cloud models)

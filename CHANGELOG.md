@@ -3,6 +3,13 @@
 All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in this file.
 
 
+## Unreleased
+
+- Added ComfyUI cancel support for local GGUF prompt generation
+  - Watches ComfyUI interrupt requests during `llama-cpp-python` generation and calls `llm.abort()` when cancellation is requested
+  - Propagates interrupted local Qwen, Wan, and Vision LLM runs as ComfyUI processing interrupts instead of wrapping them as regular runtime errors
+
+
 ## [1.0.12] - 2026-05-19
 
 - Updated Qwen cloud API model selection

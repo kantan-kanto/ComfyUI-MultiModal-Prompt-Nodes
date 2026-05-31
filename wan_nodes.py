@@ -456,7 +456,7 @@ class WanVideoPromptGenerator:
                     # Centralized import path handling
                     from import_utils import ensure_local_import
                     ensure_local_import(__file__)
-                    from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model
+                    from vision_llm_node import rewrite_prompt_with_gguf, resolve_local_gguf_path, resolve_mmproj_path_for_model, _is_interrupt_error
                     
                     # Model path retrieval
                     model_path = resolve_local_gguf_path(model_filename)
@@ -525,6 +525,8 @@ class WanVideoPromptGenerator:
                     return (output_prompt,)
                     
                 except Exception as e:
+                    if _is_interrupt_error(e):
+                        raise
                     raise RuntimeError(f"Local model processing failed: {str(e)}")
             
             # API processing (cloud models) - load API key from api_key.txt
