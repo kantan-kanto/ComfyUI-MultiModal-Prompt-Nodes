@@ -6,6 +6,7 @@ const TARGET_NODES = {
     QwenImageEditPromptGenerator: { modelWidget: "llm_model", localPrefix: "Local: " },
     WanVideoPromptGenerator: { modelWidget: "llm_model", localPrefix: "Local: " },
 };
+const WAN_NODE_NAME = "WanVideoPromptGenerator";
 
 function normalizePath(value) {
     return String(value || "").replaceAll("\\", "/");
@@ -19,6 +20,31 @@ function dirname(value) {
 
 function getWidget(node, name) {
     return node.widgets?.find((widget) => widget.name === name) || null;
+}
+
+function normalizeApiModelName(value) {
+    return String(value || "").split(" (", 1)[0];
+}
+
+function isWanVisionApiModel(value) {
+    const model = normalizeApiModelName(value);
+    return model.startsWith("qwen3.7-plus")
+        || model.startsWith("qwen3.6-")
+        || model.startsWith("qwen-vl-");
+}
+
+function isLocalModel(value, config) {
+    return Boolean(config.localPrefix && String(value || "").startsWith(config.localPrefix));
+}
+
+function isPlaceholderOption(value) {
+    return String(value || "").startsWith("(");
+}
+
+function chooseReplacementModel(previousValue, nextOptions, config) {
+    const wasLocal = isLocalModel(previousValue, config);
+    const sameKind = nextOptions.find((value) => isLocalModel(value, config) === wasLocal && !isPlaceholderOption(value));
+    return sameKind || nextOptions.find((value) => !isPlaceholderOption(value)) || nextOptions[0];
 }
 
 function getModelRelativePath(rawValue, config) {
@@ -70,6 +96,42 @@ function syncMmprojOptions(node, config) {
     node.setDirtyCanvas?.(true, true);
 }
 
+function syncWanModelOptions(node, config) {
+    const taskWidget = getWidget(node, "task_type");
+    const modelWidget = getWidget(node, config.modelWidget);
+    if (!taskWidget || !modelWidget?.options) {
+        return;
+    }
+
+    if (!Array.isArray(node.__allLlmModelOptions)) {
+        node.__allLlmModelOptions = [...(modelWidget.options.values || [])];
+    }
+
+    const allOptions = node.__allLlmModelOptions;
+    const nextOptions = taskWidget.value === "Image-to-Video"
+        ? allOptions.filter((value) => (
+            isLocalModel(value, config)
+            || isPlaceholderOption(value)
+            || isWanVisionApiModel(value)
+        ))
+        : allOptions;
+
+    modelWidget.options.values = nextOptions;
+    if (!nextOptions.includes(modelWidget.value) && nextOptions.length > 0) {
+        modelWidget.value = chooseReplacementModel(modelWidget.value, nextOptions, config);
+        syncMmprojOptions(node, config);
+    }
+
+    node.setDirtyCanvas?.(true, true);
+}
+
+function syncNodeOptions(node, nodeName, config) {
+    if (nodeName === WAN_NODE_NAME) {
+        syncWanModelOptions(node, config);
+    }
+    syncMmprojOptions(node, config);
+}
+
 function attachMmprojFilter(nodeType, nodeData) {
     const config = TARGET_NODES[nodeData.name];
     if (!config) {
@@ -90,14 +152,26 @@ function attachMmprojFilter(nodeType, nodeData) {
             };
         }
 
-        syncMmprojOptions(this, config);
+        if (nodeData.name === WAN_NODE_NAME) {
+            const taskWidget = getWidget(this, "task_type");
+            if (taskWidget) {
+                const originalCallback = taskWidget.callback;
+                taskWidget.callback = (...args) => {
+                    const callbackResult = originalCallback?.apply(taskWidget, args);
+                    syncNodeOptions(this, nodeData.name, config);
+                    return callbackResult;
+                };
+            }
+        }
+
+        syncNodeOptions(this, nodeData.name, config);
         return result;
     };
 
     const originalOnConfigure = nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure = function () {
         const result = originalOnConfigure?.apply(this, arguments);
-        queueMicrotask(() => syncMmprojOptions(this, config));
+        queueMicrotask(() => syncNodeOptions(this, nodeData.name, config));
         return result;
     };
 }
