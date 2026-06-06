@@ -6,6 +6,7 @@ const TARGET_NODES = {
     QwenImageEditPromptGenerator: { modelWidget: "llm_model", localPrefix: "Local: " },
     WanVideoPromptGenerator: { modelWidget: "llm_model", localPrefix: "Local: " },
 };
+const QWEN_NODE_NAME = "QwenImageEditPromptGenerator";
 const WAN_NODE_NAME = "WanVideoPromptGenerator";
 
 function normalizePath(value) {
@@ -26,7 +27,7 @@ function normalizeApiModelName(value) {
     return String(value || "").split(" (", 1)[0];
 }
 
-function isWanVisionApiModel(value) {
+function isVisionApiModel(value) {
     const model = normalizeApiModelName(value);
     return model.startsWith("qwen3.7-plus")
         || model.startsWith("qwen3.6-")
@@ -96,10 +97,9 @@ function syncMmprojOptions(node, config) {
     node.setDirtyCanvas?.(true, true);
 }
 
-function syncWanModelOptions(node, config) {
-    const taskWidget = getWidget(node, "task_type");
+function syncVisionRequiredModelOptions(node, config, visionRequired) {
     const modelWidget = getWidget(node, config.modelWidget);
-    if (!taskWidget || !modelWidget?.options) {
+    if (!modelWidget?.options) {
         return;
     }
 
@@ -108,11 +108,11 @@ function syncWanModelOptions(node, config) {
     }
 
     const allOptions = node.__allLlmModelOptions;
-    const nextOptions = taskWidget.value === "Image-to-Video"
+    const nextOptions = visionRequired
         ? allOptions.filter((value) => (
             isLocalModel(value, config)
             || isPlaceholderOption(value)
-            || isWanVisionApiModel(value)
+            || isVisionApiModel(value)
         ))
         : allOptions;
 
@@ -126,8 +126,13 @@ function syncWanModelOptions(node, config) {
 }
 
 function syncNodeOptions(node, nodeName, config) {
+    if (nodeName === QWEN_NODE_NAME) {
+        const promptStyleWidget = getWidget(node, "prompt_style");
+        syncVisionRequiredModelOptions(node, config, promptStyleWidget?.value === "Qwen-Image-Edit");
+    }
     if (nodeName === WAN_NODE_NAME) {
-        syncWanModelOptions(node, config);
+        const taskWidget = getWidget(node, "task_type");
+        syncVisionRequiredModelOptions(node, config, taskWidget?.value === "Image-to-Video");
     }
     syncMmprojOptions(node, config);
 }
@@ -152,12 +157,13 @@ function attachMmprojFilter(nodeType, nodeData) {
             };
         }
 
-        if (nodeData.name === WAN_NODE_NAME) {
-            const taskWidget = getWidget(this, "task_type");
-            if (taskWidget) {
-                const originalCallback = taskWidget.callback;
-                taskWidget.callback = (...args) => {
-                    const callbackResult = originalCallback?.apply(taskWidget, args);
+        if (nodeData.name === QWEN_NODE_NAME || nodeData.name === WAN_NODE_NAME) {
+            const controllerWidgetName = nodeData.name === QWEN_NODE_NAME ? "prompt_style" : "task_type";
+            const controllerWidget = getWidget(this, controllerWidgetName);
+            if (controllerWidget) {
+                const originalCallback = controllerWidget.callback;
+                controllerWidget.callback = (...args) => {
+                    const callbackResult = originalCallback?.apply(controllerWidget, args);
                     syncNodeOptions(this, nodeData.name, config);
                     return callbackResult;
                 };

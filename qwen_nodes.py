@@ -30,6 +30,7 @@ import comfy.utils
 
 import numpy as np
 from PIL import Image
+from comfy_execution.graph import ExecutionBlocker
 
 try:
     from .qwen_api_models import (
@@ -644,6 +645,15 @@ class QwenImageEditPromptGenerator:
                 if prompt_style == "Qwen-Image":
                     output_prompt = polish_prompt(_api_key, prompt, model=llm_model, max_retries=max_retries, target_language=target_language)
                 else:
+                    api_model_id = normalize_api_model_name(llm_model)
+                    if api_model_id not in QWEN_API_VISION_MODEL_IDS:
+                        message = (
+                            f'"{api_model_id}" is text-only and cannot be used for Qwen-Image-Edit. '
+                            "Use qwen3.7-plus, a Qwen3.6 model, or a qwen-vl-* model instead."
+                        )
+                        print(f"[Qwen Prompt Rewriter] Execution blocked: {message}")
+                        return (ExecutionBlocker(message),)
+
                     # Qwen-Image-Edit requires at least one image
                     if len(all_images) == 0:
                         raise ValueError("Qwen-Image-Edit style requires at least one image input!")
