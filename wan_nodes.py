@@ -24,6 +24,7 @@ import dashscope
 import folder_paths
 import numpy as np
 from PIL import Image
+from comfy_execution.graph import ExecutionBlocker
 
 try:
     from .local_gguf_utils import (
@@ -46,6 +47,10 @@ dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
 key_path = os.path.join(folder_paths.get_folder_paths("custom_nodes")[0], "ComfyUI-MultiModal-Prompt-Nodes", "api_key.txt")
 
 QWEN_API_MAIN_MODELS = [
+    "qwen3.7-plus",
+    "qwen3.7-max",
+    "qwen3.7-plus-2026-05-26",
+    "qwen3.7-max-2026-05-20",
     "qwen3.6-plus",
     "qwen3.6-flash",
     "qwen3.6-plus-2026-04-02",
@@ -76,7 +81,7 @@ QWEN_API_MODELS = (
     QWEN_API_MAIN_MODELS
     + [f"{model} (deprecated: announced offline since 2026-05-13)" for model in QWEN_API_OFFLINE_SINCE_2026_05_13]
     + [f"{model} (deprecated: offline scheduled 2026-07-13)" for model in QWEN_API_OFFLINE_SCHEDULED_2026_07_13]
-    + [f"{model} (deprecated: legacy, prefer Qwen3.6)" for model in QWEN_API_LEGACY_MODELS]
+    + [f"{model} (deprecated: legacy, prefer Qwen3.7)" for model in QWEN_API_LEGACY_MODELS]
 )
 
 QWEN_API_MODEL_IDS = set(
@@ -85,7 +90,7 @@ QWEN_API_MODEL_IDS = set(
     + QWEN_API_OFFLINE_SCHEDULED_2026_07_13
     + QWEN_API_LEGACY_MODELS
 )
-QWEN_API_VISION_MODEL_IDS = {model for model in QWEN_API_MODEL_IDS if model.startswith(("qwen3.6-", "qwen-vl-"))}
+QWEN_API_VISION_MODEL_IDS = {model for model in QWEN_API_MODEL_IDS if model.startswith(("qwen3.7-plus", "qwen3.6-", "qwen-vl-"))}
 
 def normalize_api_model_name(model):
     return model.split(" (", 1)[0]
@@ -322,7 +327,7 @@ def api(prompt, model, task_type="t2v", api_key=None, kwargs={}):
     else:
         raise Exception(f'Failed to post: {response}')
 
-def polish_prompt_wan(api_key, prompt, task_type="t2v", model="qwen3.6-plus", max_retries=10, image=None, save_tokens=True, target_language="auto"):
+def polish_prompt_wan(api_key, prompt, task_type="t2v", model="qwen3.7-plus", max_retries=10, image=None, save_tokens=True, target_language="auto"):
     """
     Polish prompt for Wan2.2 video generation
     
@@ -405,7 +410,7 @@ class WanVideoPromptGenerator:
                 }),
                 "llm_model": (all_models, {
                     "default": all_models[0] if all_models[0] != "(No models found)" else all_models[0],
-                    "tooltip": 'Select "Local: xxx" for local models. Use Qwen3.6 or qwen-vl-* for I2V with API.'
+                    "tooltip": 'Select "Local: xxx" for local models. Use qwen3.7-plus, Qwen3.6, or qwen-vl-* for I2V with API.'
                 }),
                 "mmproj": (mmproj_options, {
                     "default": mmproj_options[0],
@@ -436,7 +441,7 @@ class WanVideoPromptGenerator:
     FUNCTION = "rewrite"
     CATEGORY = "multimodal/prompt"
     DESCRIPTION = "Enhance your prompts for Wan2.2 video generation using Qwen LLM to create more detailed and expressive video descriptions."
-    
+
     def rewrite(self, prompt, task_type, target_language, llm_model, mmproj, max_retries, device, save_tokens, image=None):
         try:
             # Convert task type to internal format
@@ -543,7 +548,12 @@ class WanVideoPromptGenerator:
             if task_internal == "i2v":
                 api_model_id = normalize_api_model_name(llm_model)
                 if api_model_id not in QWEN_API_VISION_MODEL_IDS:
-                    raise ValueError(f'For Image-to-Video tasks, please use a Qwen3.6 or qwen-vl-* model. Current model: {llm_model}')
+                    message = (
+                        f'"{api_model_id}" is text-only and cannot be used for Image-to-Video tasks. '
+                        "Use qwen3.7-plus, a Qwen3.6 model, or a qwen-vl-* model instead."
+                    )
+                    print(f"[Wan2.2 Prompt Rewriter] Execution blocked: {message}")
+                    return (ExecutionBlocker(message),)
                 if image is None:
                     raise ValueError("Image input is required for Image-to-Video task!")
             

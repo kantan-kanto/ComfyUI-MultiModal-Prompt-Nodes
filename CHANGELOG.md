@@ -9,6 +9,12 @@ All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in thi
   - Watches ComfyUI interrupt requests during `llama-cpp-python` generation and calls `llm.abort()` when cancellation is requested
   - Propagates interrupted local Qwen, Wan, and Vision LLM runs as ComfyUI processing interrupts instead of wrapping them as regular runtime errors
 
+- Added Qwen3.7 API model options
+  - Added `qwen3.7-plus`, `qwen3.7-max`, and their dated snapshots to Qwen and Wan prompt generator API model lists
+  - Updated API defaults to `qwen3.7-plus`
+  - Allowed `qwen3.7-plus` for vision input workflows while keeping `qwen3.7-max` text-only
+  - Blocked Wan I2V text-only API model selections with a clear ComfyUI execution-block message instead of a runtime traceback
+
 
 ## [1.0.12] - 2026-05-19
 
