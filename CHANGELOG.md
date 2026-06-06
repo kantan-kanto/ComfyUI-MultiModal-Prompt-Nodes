@@ -15,8 +15,8 @@ All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in thi
   - Allowed `qwen3.7-plus` for vision input workflows while keeping `qwen3.7-max` text-only
   - Blocked Wan I2V text-only API model selections with a clear ComfyUI execution-block message instead of a runtime traceback
   - Centralized shared Qwen API model definitions used by Qwen and Wan prompt generator nodes
-  - Hid text-only API models from the Wan model dropdown when Image-to-Video is selected while keeping them available for Text-to-Video
-  - Hid text-only API models from the Qwen model dropdown when Qwen-Image-Edit is selected while keeping them available for Qwen-Image
+  - Hid text-only API models from the Wan model dropdown when Image-to-Video is selected while keeping them available for Text-to-Video, without automatically switching the selected model
+  - Hid text-only API models from the Qwen model dropdown when Qwen-Image-Edit is selected while keeping them available for Qwen-Image, without automatically switching the selected model
   - Blocked Qwen-Image-Edit text-only API model selections with a clear ComfyUI execution-block message instead of a runtime traceback
 
 

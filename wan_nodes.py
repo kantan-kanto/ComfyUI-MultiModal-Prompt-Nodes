@@ -513,7 +513,7 @@ class WanVideoPromptGenerator:
                 if api_model_id not in QWEN_API_VISION_MODEL_IDS:
                     message = (
                         f'"{api_model_id}" is text-only and cannot be used for Image-to-Video tasks. '
-                        "Use qwen3.7-plus, a Qwen3.6 model, or a qwen-vl-* model instead."
+                        "Please select a vision-capable model such as qwen3.7-plus, a Qwen3.6 model, or a qwen-vl-* model."
                     )
                     print(f"[Wan2.2 Prompt Rewriter] Execution blocked: {message}")
                     return (ExecutionBlocker(message),)

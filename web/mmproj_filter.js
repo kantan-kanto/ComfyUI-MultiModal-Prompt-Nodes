@@ -42,12 +42,6 @@ function isPlaceholderOption(value) {
     return String(value || "").startsWith("(");
 }
 
-function chooseReplacementModel(previousValue, nextOptions, config) {
-    const wasLocal = isLocalModel(previousValue, config);
-    const sameKind = nextOptions.find((value) => isLocalModel(value, config) === wasLocal && !isPlaceholderOption(value));
-    return sameKind || nextOptions.find((value) => !isPlaceholderOption(value)) || nextOptions[0];
-}
-
 function getModelRelativePath(rawValue, config) {
     if (typeof rawValue !== "string") {
         return null;
@@ -117,11 +111,6 @@ function syncVisionRequiredModelOptions(node, config, visionRequired) {
         : allOptions;
 
     modelWidget.options.values = nextOptions;
-    if (!nextOptions.includes(modelWidget.value) && nextOptions.length > 0) {
-        modelWidget.value = chooseReplacementModel(modelWidget.value, nextOptions, config);
-        syncMmprojOptions(node, config);
-    }
-
     node.setDirtyCanvas?.(true, true);
 }
 

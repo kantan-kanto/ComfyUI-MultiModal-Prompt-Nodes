@@ -649,7 +649,7 @@ class QwenImageEditPromptGenerator:
                     if api_model_id not in QWEN_API_VISION_MODEL_IDS:
                         message = (
                             f'"{api_model_id}" is text-only and cannot be used for Qwen-Image-Edit. '
-                            "Use qwen3.7-plus, a Qwen3.6 model, or a qwen-vl-* model instead."
+                            "Please select a vision-capable model such as qwen3.7-plus, a Qwen3.6 model, or a qwen-vl-* model."
                         )
                         print(f"[Qwen Prompt Rewriter] Execution blocked: {message}")
                         return (ExecutionBlocker(message),)
