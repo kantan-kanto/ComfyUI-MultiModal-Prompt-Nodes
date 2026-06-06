@@ -3,21 +3,25 @@
 All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in this file.
 
 
-## Unreleased
+## [1.0.13] - 2026-06-06
 
-- Added ComfyUI cancel support for local GGUF prompt generation
+- Updated Qwen cloud API model selection
+  - Added Qwen3.7 API models, including `qwen3.7-plus`, `qwen3.7-max`, and their dated snapshots
+  - Updated Qwen and Wan API defaults to `qwen3.7-plus`
+  - Kept Qwen3.6 and legacy API models selectable for existing workflow compatibility
+
+- Improved vision-only API model handling
+  - Treats `qwen3.7-plus`, Qwen3.6, and `qwen-vl-*` as vision-capable API choices
+  - Keeps text-only API models, such as `qwen3.7-max`, available for `Qwen-Image` and Wan Text-to-Video
+  - Hides text-only API models in the UI when `Qwen-Image-Edit` or Wan Image-to-Video is selected, without automatically switching the selected model
+  - Blocks invalid text-only API model selections in Qwen-Image-Edit and Wan Image-to-Video with clear ComfyUI execution-block messages instead of runtime tracebacks
+
+- Improved maintainability
+  - Centralized shared Qwen API model definitions used by Qwen and Wan prompt generator nodes
+
+- Improved local generation cancellation
   - Watches ComfyUI interrupt requests during `llama-cpp-python` generation and calls `llm.abort()` when cancellation is requested
   - Propagates interrupted local Qwen, Wan, and Vision LLM runs as ComfyUI processing interrupts instead of wrapping them as regular runtime errors
-
-- Added Qwen3.7 API model options
-  - Added `qwen3.7-plus`, `qwen3.7-max`, and their dated snapshots to Qwen and Wan prompt generator API model lists
-  - Updated API defaults to `qwen3.7-plus`
-  - Allowed `qwen3.7-plus` for vision input workflows while keeping `qwen3.7-max` text-only
-  - Blocked Wan I2V text-only API model selections with a clear ComfyUI execution-block message instead of a runtime traceback
-  - Centralized shared Qwen API model definitions used by Qwen and Wan prompt generator nodes
-  - Hid text-only API models from the Wan model dropdown when Image-to-Video is selected while keeping them available for Text-to-Video, without automatically switching the selected model
-  - Hid text-only API models from the Qwen model dropdown when Qwen-Image-Edit is selected while keeping them available for Qwen-Image, without automatically switching the selected model
-  - Blocked Qwen-Image-Edit text-only API model selections with a clear ComfyUI execution-block message instead of a runtime traceback
 
 
 ## [1.0.12] - 2026-05-19

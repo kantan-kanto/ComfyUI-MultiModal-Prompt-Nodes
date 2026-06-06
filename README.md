@@ -1,6 +1,6 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.12
+**Version:** 1.0.13
 **License:** GPL-3.0
 
 Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **Qwen-Image-Edit** and **Wan2.2**.  
@@ -470,7 +470,8 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.12
-- Prioritized Qwen3.6 cloud API models in Qwen and Wan prompt generator nodes
-- Kept legacy Qwen API models selectable with deprecation notices for workflow compatibility
-- Updated Wan I2V API validation to allow Qwen3.6 vision-capable models
+### Current Version: 1.0.13
+- Added Qwen3.7 cloud API models and updated API defaults to `qwen3.7-plus`
+- Kept Qwen3.6 and legacy API models selectable for existing workflow compatibility
+- Hid text-only API models from vision-only workflows while keeping them available for text-only workflows
+- Improved local GGUF generation cancellation handling for Qwen, Wan, and Vision LLM runs
