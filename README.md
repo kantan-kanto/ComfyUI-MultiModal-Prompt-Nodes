@@ -7,7 +7,9 @@ Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for 
 Supports **local LLM / local GGUF models** (Qwen2.5-VL, Qwen3-VL, Qwen3.5 and Qwen3.6) and **Qwen API** for image and video prompt generation and enhancement.
 
 ---
-## Upgrade Notes for Existing Users
+
+<details>
+<summary><strong>Upgrade Notes for Existing Users</strong></summary>
 
 The following notes are intended for existing users upgrading from older releases.
 
@@ -35,6 +37,8 @@ Vision input support varies by model and llama-cpp-python version. See Installat
 Starting from **v1.0.6**, internal GGUF model handling has been improved to ensure stable behavior
 when switching between different Qwen3-VL models (e.g. 8B ↔ 4B), with mmproj files now being
 properly reloaded as part of the model switching process.
+
+</details>
 
 ---
 ## Important Notes
@@ -88,21 +92,42 @@ cd ComfyUI/custom_nodes
 git clone https://github.com/yourusername/ComfyUI-MultiModal-Prompt-Nodes.git
 ```
 
-### 2. Install Dependencies
+### 2. Install Non-LLM Dependencies
+
+Install the lightweight dependencies used by the nodes for Dashscope API access,
+image handling, and array processing:
 
 ```bash
 cd ComfyUI-MultiModal-Prompt-Nodes
-pip install -r requirements.txt
-```
-
-**Alternative manual installation:**
-```bash
 pip install dashscope pillow numpy
 ```
 
+These packages are required for both API-based workflows and local GGUF
+workflows.
+
+Do **not** use `pip install -r requirements.txt` if you plan to install a custom
+`llama-cpp-python` build for local multimodal models. The requirements file
+includes the official PyPI package, which may overwrite or conflict with a
+custom build. Install `llama-cpp-python` separately in the next step according
+to the model family and backend you want to use.
+
 ### 3. Install llama-cpp-python (REQUIRED for local models)
 
-**Important:** Model compatibility varies by llama-cpp-python version. Based on my testing environment:
+Skip this step if you only use Qwen API / Dashscope models. Local GGUF models
+require `llama-cpp-python` in the same Python environment that runs ComfyUI.
+
+Model support depends heavily on the `llama-cpp-python` build. Vision support,
+GPU acceleration, and newer Qwen multimodal handlers can vary by version,
+operating system, Python version, GPU driver, and backend.
+
+**Recommended choice:**
+
+- **Qwen3-VL or Qwen3.5 / Qwen3.6 local models:** use a recent
+  [JamePeng llama-cpp-python fork](https://github.com/JamePeng/llama-cpp-python)
+  build that matches your OS, Python version, and acceleration backend.
+- **Qwen2.5-VL only:** the official PyPI package can be used as a fallback.
+
+Based on the author's test environment:
 
 | Version | Qwen2.5-VL | Qwen3-VL | Qwen3.5/3.6 | 
 |---------|------------|----------|---------|
@@ -110,14 +135,27 @@ pip install dashscope pillow numpy
 | 0.3.21+ (JamePeng fork) | ✅ | ✅ | ❌ |
 | 0.3.36+ (JamePeng fork) | ✅ | ✅ | ✅ | 
 
-***Note:** Vision input support may vary depending on your environment and configuration.
+**Note:** This table is a compatibility reference, not a guarantee. Your results
+may differ depending on your hardware, drivers, Python environment, and the
+exact wheel or build options used.
 
-**Recommended Installation (JamePeng fork for Qwen3-VL and Qwen3.5/3.6 support):**  
-Please follow the build and installation instructions provided in the JamePeng fork repository, as this fork requires a custom build and cannot be reliably installed via a simple `pip install`.
+**Recommended installation for Qwen3-VL / Qwen3.5 / Qwen3.6:**
 
-**Source:** https://github.com/JamePeng/llama-cpp-python
+Follow the build and installation instructions in the JamePeng fork:
+https://github.com/JamePeng/llama-cpp-python
 
-⚠️ **Disclaimer:** Your results may differ depending on system configuration, GPU drivers, and other factors. If you encounter issues, please verify your environment setup and consider reporting compatibility details.
+This fork usually requires a custom build or a backend-specific wheel. A simple
+`pip install llama-cpp-python` may install the official package instead, which
+does not provide the same multimodal compatibility.
+
+**Fallback for Qwen2.5-VL only:**
+
+```bash
+pip install llama-cpp-python
+```
+
+After installing or changing `llama-cpp-python`, restart ComfyUI so the nodes
+load the updated package.
 
 ### 4. Place Models
 
