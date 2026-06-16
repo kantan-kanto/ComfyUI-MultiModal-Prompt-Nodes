@@ -28,6 +28,7 @@ import io
 import re
 import json
 import base64
+import inspect
 import threading
 import numpy as np
 from PIL import Image
@@ -56,19 +57,28 @@ try:
     from llama_cpp import Llama
 
     try:
-        from llama_cpp.llama_chat_format import Qwen25VLChatHandler
+        try:
+            from llama_cpp.llama_chat_format import Qwen25VLChatHandler
+        except ImportError:
+            from llama_cpp.llama_multimodal import Qwen25VLChatHandler
         QWEN2_AVAILABLE = True
     except ImportError:
         QWEN2_AVAILABLE = False   
 
     try:
-        from llama_cpp.llama_chat_format import Qwen3VLChatHandler
+        try:
+            from llama_cpp.llama_chat_format import Qwen3VLChatHandler
+        except ImportError:
+            from llama_cpp.llama_multimodal import Qwen3VLChatHandler
         QWEN3_AVAILABLE = True
     except ImportError:
         QWEN3_AVAILABLE = False
 
     try:
-        from llama_cpp.llama_chat_format import Qwen35ChatHandler
+        try:
+            from llama_cpp.llama_chat_format import Qwen35ChatHandler
+        except ImportError:
+            from llama_cpp.llama_multimodal import Qwen35ChatHandler
         QWEN35_AVAILABLE = True
     except ImportError:
         QWEN35_AVAILABLE = False
@@ -80,6 +90,64 @@ except ImportError:
     QWEN3_AVAILABLE = False
     QWEN35_AVAILABLE = False
     print("[Vision LLM Node] Warning: llama-cpp-python not available")
+
+
+def _get_mtmd_chat_handler_class():
+    """Return the installed MTMD base handler class when available."""
+    try:
+        from llama_cpp.llama_multimodal import MTMDChatHandler
+        return MTMDChatHandler
+    except Exception:
+        pass
+
+    try:
+        from llama_cpp.llama_chat_format import MTMDChatHandler
+        return MTMDChatHandler
+    except Exception:
+        return None
+
+
+def _get_init_parameters(handler_cls) -> Dict[str, inspect.Parameter]:
+    try:
+        return dict(inspect.signature(handler_cls.__init__).parameters)
+    except (TypeError, ValueError):
+        return {}
+
+
+def _has_var_keyword(parameters: Dict[str, inspect.Parameter]) -> bool:
+    return any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values())
+
+
+def _mmproj_keyword_for_handler(handler_cls) -> str:
+    """Choose the mmproj keyword accepted by this llama-cpp-python build.
+
+    JamePeng llama-cpp-python builds moved the MTMD path argument from
+    clip_model_path to mmproj_path. Some Qwen handlers forward **kwargs to the
+    MTMD base handler, so inspect the base class before falling back.
+    """
+    handler_params = _get_init_parameters(handler_cls)
+
+    if "mmproj_path" in handler_params:
+        return "mmproj_path"
+    if "clip_model_path" in handler_params and not _has_var_keyword(handler_params):
+        return "clip_model_path"
+
+    if _has_var_keyword(handler_params):
+        mtmd_cls = _get_mtmd_chat_handler_class()
+        if mtmd_cls is not None:
+            mtmd_params = _get_init_parameters(mtmd_cls)
+            if "mmproj_path" in mtmd_params:
+                return "mmproj_path"
+            if "clip_model_path" in mtmd_params:
+                return "clip_model_path"
+
+    if "clip_model_path" in handler_params:
+        return "clip_model_path"
+    return "clip_model_path"
+
+
+def _mmproj_kwargs_for_handler(handler_cls, mmproj_path: str) -> Dict[str, str]:
+    return {_mmproj_keyword_for_handler(handler_cls): mmproj_path}
 
 # ============================================================================
 # System Prompts
@@ -681,9 +749,9 @@ class GGUFModelManager:
                         "Please download mmproj file from the model's GGUF repo.\n"
                         f"Expected location: {model_dir}{os.sep}mmproj-*.gguf"
                     )
-            else:
-                mmproj_path = self._normalize_path(mmproj_path)
 
+        if mmproj_path is not None and (is_qwen2 or is_qwen3 or is_qwen35):
+            mmproj_path = self._normalize_path(mmproj_path)
             print(f"[GGUFModelManager] Using mmproj: {mmproj_path}")
 
         # Decide vision mode + initialize handler
@@ -698,7 +766,9 @@ class GGUFModelManager:
             if mmproj_path is not None and os.path.exists(mmproj_path):
                 try:
                     print(f"[GGUFModelManager] Qwen2.5-VL with mmproj: {mmproj_path}")
-                    chat_handler = Qwen25VLChatHandler(clip_model_path=mmproj_path)
+                    chat_handler = Qwen25VLChatHandler(
+                        **_mmproj_kwargs_for_handler(Qwen25VLChatHandler, mmproj_path)
+                    )
                     use_vision = True
                 except Exception as e:
                     print(f"[GGUFModelManager] Warning: Failed to initialize Qwen2.5-VL chat handler: {e}")
@@ -712,7 +782,9 @@ class GGUFModelManager:
             if mmproj_path is not None and os.path.exists(mmproj_path):
                 try:
                     print(f"[GGUFModelManager] Qwen3-VL with mmproj: {mmproj_path}")
-                    chat_handler = Qwen3VLChatHandler(clip_model_path=mmproj_path)
+                    chat_handler = Qwen3VLChatHandler(
+                        **_mmproj_kwargs_for_handler(Qwen3VLChatHandler, mmproj_path)
+                    )
                     use_vision = True
                 except Exception as e:
                     print(f"[GGUFModelManager] Warning: Failed to initialize Qwen3-VL chat handler: {e}")
@@ -727,7 +799,7 @@ class GGUFModelManager:
                 try:
                     print(f"[GGUFModelManager] Qwen3.5/3.6 with mmproj: {mmproj_path}")
                     chat_handler = Qwen35ChatHandler(
-                        clip_model_path=mmproj_path,
+                        **_mmproj_kwargs_for_handler(Qwen35ChatHandler, mmproj_path),
                         enable_thinking=False,
                         image_min_tokens=1024,
                     )
