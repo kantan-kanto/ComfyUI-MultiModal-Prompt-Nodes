@@ -1,6 +1,6 @@
 # ComfyUI-MultiModal-Prompt-Nodes
 
-**Version:** 1.0.13
+**Version:** 1.0.14
 **License:** GPL-3.0
 
 Multimodal prompt generator nodes for ComfyUI, designed to generate prompts for **Qwen-Image-Edit** and **Wan2.2**.  
@@ -342,14 +342,14 @@ A:
 3. Verify file extensions are `.gguf`
 
 **Q: Models stored via `extra_model_paths.yaml` (e.g. on a different drive) are not listed in the dropdown**  
-A: Versions ≤ 1.0.10 only searched `folder_paths.models_dir/LLM` and `folder_paths.models_dir/text_encoders` directly and ignored paths registered by `extra_model_paths.yaml`. This meant models on a separate drive — such as `W:\ai-models\text_encoders\` — were never discovered even though ComfyUI itself could load them.
+A: Fixed in v1.0.11. Versions ≤ 1.0.10 only searched `folder_paths.models_dir/LLM` and `folder_paths.models_dir/text_encoders` directly and ignored paths registered by `extra_model_paths.yaml`. This meant models on a separate drive — such as `W:\ai-models\text_encoders\` — were never discovered even though ComfyUI itself could load them.
 
-Fixed in the patch that follows: `local_gguf_utils.py` now calls `folder_paths.get_folder_paths("text_encoders")` and `folder_paths.get_folder_paths("llm")` first, which returns every path registered by ComfyUI (including entries from `extra_model_paths.yaml`). Models on other drives or in non-default locations are resolved as absolute paths so the rest of the load pipeline still works correctly.
+Current versions call `folder_paths.get_folder_paths("text_encoders")` and `folder_paths.get_folder_paths("llm")` first, which returns every path registered by ComfyUI, including entries from `extra_model_paths.yaml`. Models on other drives or in non-default locations are resolved as absolute paths so the rest of the load pipeline still works correctly.
 
 **Q: mmproj auto-detect fails with "no mmproj matched the model family prefix" even though a `mmproj-*.gguf` file exists next to the model**  
-A: Auto-detect previously required the mmproj filename to begin with the model's family prefix (e.g. `mmproj-qwen3.5-BF16.gguf`). Files with generic names like `mmproj-BF16.gguf` were rejected.
+A: Fixed in v1.0.11. Auto-detect previously required the mmproj filename to begin with the model's family prefix (e.g. `mmproj-qwen3.5-BF16.gguf`). Files with generic names like `mmproj-BF16.gguf` were rejected.
 
-Fixed in the patch that follows: if no family-prefixed mmproj is found but there is **exactly one** `mmproj-*.gguf` in the model's directory, that file is used automatically with a fallback warning in the log. If multiple unmatched mmproj files are present you still need to select one manually.
+Current versions still prefer a family-prefixed mmproj. If no family-prefixed mmproj is found but there is **exactly one** `mmproj-*.gguf` in the model's directory, that file is used automatically with a fallback warning in the log. If multiple unmatched mmproj files are present, you still need to select one manually.
 
 **Q: Vision input not working with Qwen2.5-VL**  
 A: Use v1.0.8 or later. Fixed bug.
@@ -508,8 +508,7 @@ Areas needing help:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-### Current Version: 1.0.13
-- Added Qwen3.7 cloud API models and updated API defaults to `qwen3.7-plus`
-- Kept Qwen3.6 and legacy API models selectable for existing workflow compatibility
-- Hid text-only API models from vision-only workflows while keeping them available for text-only workflows
-- Improved local GGUF generation cancellation handling for Qwen, Wan, and Vision LLM runs
+### Current Version: 1.0.14
+- Added compatibility with JamePeng `llama-cpp-python` MTMD handlers that use either `clip_model_path` or `mmproj_path`
+- Fixed recent Qwen local GGUF vision builds falling back to text-only mode when the handler expects `mmproj_path`
+- Improved mmproj logging so the selected projector is reported consistently without printing `None`

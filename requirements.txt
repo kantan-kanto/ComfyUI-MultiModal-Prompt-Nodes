@@ -1,12 +1,12 @@
 # ComfyUI-MultiModal-Prompt-Nodes Requirements
 
 # Core dependencies
-llama-cpp-python>=0.3.16  # 0.3.21+ recommended for Qwen3-VL support
+llama-cpp-python>=0.3.16  # Recent JamePeng fork recommended for Qwen3-VL/Qwen3.5/Qwen3.6
 dashscope>=1.20.0
 pillow>=10.0.0
 numpy>=1.24.0
 
 # Optional: For better performance
-# llama-cpp-python==0.3.21  # JamePeng fork for Qwen3-VL vision support
+# Use a backend-specific JamePeng fork build for Qwen3-VL/Qwen3.5/Qwen3.6 vision support
 
 # Note: ComfyUI and its dependencies (torch, etc.) are assumed to be installed

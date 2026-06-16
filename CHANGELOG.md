@@ -3,6 +3,18 @@
 All notable changes to ComfyUI-MultiModal-Prompt-Nodes will be documented in this file.
 
 
+## [1.0.14] - 2026-06-16
+
+- Fixed local Qwen GGUF vision handler initialization with recent JamePeng `llama-cpp-python` builds
+  - Added runtime compatibility for MTMD handlers that expect `mmproj_path`
+  - Preserved compatibility with older builds that still require `clip_model_path`
+  - Prevents Qwen3-VL and Qwen3.5/3.6 local vision runs from falling back to text-only mode because of the handler keyword mismatch
+
+- Improved mmproj logging
+  - Reports the selected mmproj after manual selection or auto-detection for Qwen local vision models
+  - Avoids printing `Using mmproj: None` for text-only paths
+
+
 ## [1.0.13] - 2026-06-06
 
 - Updated Qwen cloud API model selection
